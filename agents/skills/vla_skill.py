@@ -5,6 +5,7 @@
 """
 
 from abc import ABC, abstractmethod
+import asyncio
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
@@ -120,6 +121,9 @@ class VLASkill(ABC):
 
                 # 更新观察（需要子类实现）
                 observation = await self._get_observation()
+
+                # 添加延迟避免过快执行
+                await asyncio.sleep(0.01)
 
             return SkillResult(
                 status=SkillStatus.SUCCESS,

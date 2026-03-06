@@ -18,8 +18,13 @@ class VLAAdapterBase(ABC):
         Args:
             config: 配置字典
         """
-        self.config = config
+        self.config = config or {}
         self._initialized = False
+        self._validate_config()
+
+    def _validate_config(self) -> None:
+        """验证配置参数"""
+        pass  # 子类可以重写此方法进行验证
 
     @abstractmethod
     def reset(self) -> None:
