@@ -3,5 +3,7 @@
 
 from .base import VLAAdapterBase
 from .lerobot import LeRobotVLAAdapter
+from .act import ACTVLAAdapter
+from .gr00t import GR00TVLAAdapter
 
-__all__ = ["VLAAdapterBase", "LeRobotVLAAdapter"]
+__all__ = ["VLAAdapterBase", "LeRobotVLAAdapter", "ACTVLAAdapter", "GR00TVLAAdapter"]
