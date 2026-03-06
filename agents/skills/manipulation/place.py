@@ -30,7 +30,7 @@ class PlaceSkill(VLASkill):
 
     def build_skill_token(self) -> str:
         """构建技能令牌"""
-        return f"place at {self.target_position}"
+        return f"place(position={self.target_position})"
 
     def check_preconditions(self, observation: Dict) -> bool:
         """检查执行前置条件

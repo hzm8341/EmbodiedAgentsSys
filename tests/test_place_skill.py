@@ -32,8 +32,7 @@ def test_build_skill_token():
 
     skill = PlaceSkill(target_position=[0.5, 0.0, 0.1])
     token = skill.build_skill_token()
-    assert "place" in token
-    assert "0.5" in token
+    assert token == "place(position=[0.5, 0.0, 0.1])"
 
 
 def test_check_preconditions():

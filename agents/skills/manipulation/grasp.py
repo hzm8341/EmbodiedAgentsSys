@@ -30,7 +30,7 @@ class GraspSkill(VLASkill):
 
     def build_skill_token(self) -> str:
         """构建技能令牌"""
-        return f"grasp {self.object_name}"
+        return f"grasp(object={self.object_name})"
 
     def check_preconditions(self, observation: Dict) -> bool:
         """检查执行前置条件

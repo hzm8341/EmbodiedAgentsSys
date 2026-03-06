@@ -31,7 +31,7 @@ def test_build_skill_token():
     from agents.skills.manipulation.grasp import GraspSkill
 
     skill = GraspSkill(object_name="cube")
-    assert skill.build_skill_token() == "grasp cube"
+    assert skill.build_skill_token() == "grasp(object=cube)"
 
 
 def test_build_skill_token_different_objects():
@@ -39,10 +39,10 @@ def test_build_skill_token_different_objects():
     from agents.skills.manipulation.grasp import GraspSkill
 
     skill_bottle = GraspSkill(object_name="bottle")
-    assert skill_bottle.build_skill_token() == "grasp bottle"
+    assert skill_bottle.build_skill_token() == "grasp(object=bottle)"
 
     skill_tool = GraspSkill(object_name="screwdriver")
-    assert skill_tool.build_skill_token() == "grasp screwdriver"
+    assert skill_tool.build_skill_token() == "grasp(object=screwdriver)"
 
 
 def test_check_preconditions():

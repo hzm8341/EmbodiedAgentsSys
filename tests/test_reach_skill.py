@@ -32,8 +32,7 @@ def test_build_skill_token():
 
     skill = ReachSkill(target_position=[0.3, 0.2, 0.1])
     token = skill.build_skill_token()
-    assert "reach" in token
-    assert "0.3" in token
+    assert token == "reach(position=[0.3, 0.2, 0.1])"
 
 
 def test_reach_skill_with_position_3d():
