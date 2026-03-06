@@ -1,0 +1,153 @@
+# agents/skills/vla_skill.py
+"""VLA Skill 基类
+
+基于 VLA (Vision-Language-Action) 的 Skill 抽象基类。
+"""
+
+from abc import ABC, abstractmethod
+from typing import Dict, Any, List, Optional
+from dataclasses import dataclass, field
+from enum import Enum
+
+
+class SkillStatus(Enum):
+    """技能执行状态"""
+    IDLE = "idle"
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+
+
+@dataclass
+class SkillResult:
+    """技能执行结果"""
+    status: SkillStatus
+    output: Any = None
+    error: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class VLASkill(ABC):
+    """基于 VLA 的 Skill 抽象基类
+
+    定义了 VLA 驱动技能的标准接口和行为。
+    """
+
+    # 类属性：子类需要定义
+    required_inputs: List[str] = []
+    produced_outputs: List[str] = []
+    default_vla: Optional[str] = None
+    max_steps: int = 100
+
+    def __init__(self, vla_adapter=None, **kwargs):
+        """初始化 VLASkill
+
+        Args:
+            vla_adapter: VLA 适配器实例
+            **kwargs: 其他配置参数
+        """
+        self.vla = vla_adapter
+        self._status = SkillStatus.IDLE
+        self._config = kwargs
+
+    @abstractmethod
+    def build_skill_token(self) -> str:
+        """构建 VLA 推理用的任务描述
+
+        Returns:
+            技能令牌字符串
+        """
+        pass
+
+    @abstractmethod
+    def check_preconditions(self, observation: Dict) -> bool:
+        """检查执行前置条件
+
+        Args:
+            observation: 当前观察数据
+
+        Returns:
+            是否满足前置条件
+        """
+        pass
+
+    @abstractmethod
+    def check_termination(self, observation: Dict) -> bool:
+        """检查是否满足终止条件
+
+        Args:
+            observation: 当前观察数据
+
+        Returns:
+            是否应该终止
+        """
+        pass
+
+    async def execute(self, observation: Dict) -> SkillResult:
+        """执行 Skill（异步封装同步逻辑）
+
+        Args:
+            observation: 当前观察数据
+
+        Returns:
+            技能执行结果
+        """
+        self._status = SkillStatus.RUNNING
+
+        try:
+            # 检查前置条件
+            if not self.check_preconditions(observation):
+                return SkillResult(
+                    status=SkillStatus.FAILED,
+                    error="Preconditions not met"
+                )
+
+            skill_token = self.build_skill_token()
+
+            for step in range(self.max_steps):
+                # 检查终止条件
+                if self.check_termination(observation):
+                    return SkillResult(
+                        status=SkillStatus.SUCCESS,
+                        output={"steps": step + 1}
+                    )
+
+                # VLA 推理
+                action = self.vla.act(observation, skill_token)
+
+                # 执行动作
+                result = self.vla.execute(action)
+
+                # 更新观察（需要子类实现）
+                observation = await self._get_observation()
+
+            return SkillResult(
+                status=SkillStatus.SUCCESS,
+                output={"steps": self.max_steps}
+            )
+
+        except Exception as e:
+            self._status = SkillStatus.FAILED
+            return SkillResult(
+                status=SkillStatus.FAILED,
+                error=str(e)
+            )
+
+    async def _get_observation(self) -> Dict:
+        """获取观察（子类可覆盖）"""
+        return {}
+
+    @property
+    def status(self) -> SkillStatus:
+        """获取当前状态"""
+        return self._status
+
+    @property
+    def is_running(self) -> bool:
+        """是否正在运行"""
+        return self._status == SkillStatus.RUNNING
+
+    @property
+    def is_idle(self) -> bool:
+        """是否空闲"""
+        return self._status == SkillStatus.IDLE
