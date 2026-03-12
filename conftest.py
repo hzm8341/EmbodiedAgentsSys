@@ -1,13 +1,11 @@
 """
 Root conftest.py - stubs ROS2 and deep agent dependencies before any test
-collection occurs, so the launch_testing ROS2 pytest plugin can safely scan
-test files in a non-ROS environment.
+collection occurs, so tests can run in a non-ROS environment.
 """
 import sys
 import types
 import importlib
 import importlib.util
-
 
 WORKTREE = "/media/hzm/data_disk/EmbodiedAgentsSys/.worktrees/vla-plus"
 
@@ -27,12 +25,12 @@ def _make_stub_package(name: str, path: str) -> types.ModuleType:
     return mod
 
 
-def _load_module_directly(module_name: str, file_path: str, package: str) -> types.ModuleType:
+def _load_module_directly(module_name: str, file_path: str, package: str = None) -> types.ModuleType:
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if spec is None:
         return None
     mod = importlib.util.module_from_spec(spec)
-    mod.__package__ = package
+    mod.__package__ = package or ".".join(module_name.split(".")[:-1])
     sys.modules[module_name] = mod
     spec.loader.exec_module(mod)
     return mod
@@ -47,7 +45,7 @@ def _is_ros_available() -> bool:
 
 
 if not _is_ros_available():
-    # --- Stub ROS2 and all transitive dependencies ---
+    # Stub ROS2 and all transitive dependencies
     for name in [
         "rclpy", "rclpy.logging", "rclpy.node", "rclpy.signals",
         "rclpy.exceptions", "rclpy.impl", "rclpy.impl.implementation_singleton",
@@ -78,7 +76,7 @@ if not _is_ros_available():
         debug=lambda *a, **k: None,
     )
 
-    # --- Stub agents.ros with all symbols component_base needs ---
+    # Stub agents.ros
     agents_ros = _stub("agents.ros")
     agents_ros.BaseAttrs = object
     agents_ros.BaseComponent = object
@@ -98,22 +96,22 @@ if not _is_ros_available():
         or_=lambda *a, **k: None,
     )
 
-    # --- Stub agents.config and agents.utils ---
+    # Stub agents.config and agents.utils
     agents_config = _stub("agents.config")
     agents_config.BaseComponentConfig = object
     agents_utils = _stub("agents.utils")
     agents_utils.flatten = lambda x: x
 
-    # --- Stub agents.models ---
+    # Stub agents.models
     agents_models = _stub("agents.models")
     for attr in ["Idefics2", "OllamaModel", "Model"]:
         setattr(agents_models, attr, object)
 
-    # --- Stub agents.vectordbs ---
+    # Stub agents.vectordbs
     agents_vdbs = _stub("agents.vectordbs")
     agents_vdbs.ChromaDB = object
 
-    # --- Stub agents.clients and submodules ---
+    # Stub agents.clients and submodules
     for name in [
         "agents.clients", "agents.clients.roboml", "agents.clients.generic",
         "agents.clients.model_base", "agents.clients.ros", "agents.clients.ollama",
@@ -127,24 +125,30 @@ if not _is_ros_available():
         ]:
             setattr(m, attr, object)
 
-    # --- Stub agents.components as a package (prevents __init__.py execution) ---
-    if "agents.components" not in sys.modules:
-        _make_stub_package("agents.components", f"{WORKTREE}/agents/components")
+    # Stub agents.components as a package (prevents __init__.py execution)
+    _make_stub_package("agents.components", f"{WORKTREE}/agents/components")
 
-    # Directly load submodules that tests actually need
+    # Directly load submodules that tests actually need (skip if not yet created)
+    import os
     for submod_name, filename in [
         ("agents.components.data_structures", "data_structures.py"),
         ("agents.components.sam3_segmenter", "sam3_segmenter.py"),
+        ("agents.components.qwen3l_processor", "qwen3l_processor.py"),
+        ("agents.components.vla_plus", "vla_plus.py"),
     ]:
-        if submod_name not in sys.modules:
-            path = f"{WORKTREE}/agents/components/{filename}"
-            mod = _load_module_directly(submod_name, path, "agents.components")
-            if mod is not None:
-                attr = filename.replace(".py", "")
-                setattr(sys.modules["agents.components"], attr, mod)
+        path = f"{WORKTREE}/agents/components/{filename}"
+        if not os.path.exists(path):
+            continue
+        mod = _load_module_directly(submod_name, path)
+        if mod is not None:
+            attr = filename.replace(".py", "")
+            setattr(sys.modules["agents.components"], attr, mod)
 
-    # --- Stub agents.components.voice_command ---
+    # Load agents.config_vla_plus directly for config tests
+    config_path = f"{WORKTREE}/agents/config_vla_plus.py"
+    if os.path.exists(config_path):
+        _load_module_directly("agents.config_vla_plus", config_path, "agents")
+
+    # Stub agents.components.voice_command
     vc = _stub("agents.components.voice_command")
     vc.VoiceCommand = object
-
-collect_ignore_glob = ["test_*.py"]
