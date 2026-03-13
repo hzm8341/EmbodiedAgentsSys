@@ -36,6 +36,12 @@ A Component is the main execution unit in _EmbodiedAgents_ and in essence each c
 ```
 """
 
+from .data_structures import (
+    SceneAnalysisResult,
+    ObjectInfo,
+    GraspCommand,
+    GraspPoint
+)
 from .component_base import Component
 from .imagestovideo import VideoMessageMaker
 from .llm import LLM
@@ -50,6 +56,10 @@ from .vla import VLA
 
 __all__ = [
     "Component",
+    "SceneAnalysisResult",
+    "ObjectInfo",
+    "GraspCommand",
+    "GraspPoint",
     "ModelComponent",
     "MapEncoding",
     "MLLM",

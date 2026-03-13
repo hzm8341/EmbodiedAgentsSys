@@ -26,8 +26,9 @@ addopts = "-ra -q"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format="[%(levelname)s] [%(asctime)s] [%(name)s] [%(process)d-%(thread)d] %(message)s"
+asyncio_mode = "auto"
 testpaths = [
-    "agents/tests"
+    "tests"
 ]
 
 [tool.interrogate]
