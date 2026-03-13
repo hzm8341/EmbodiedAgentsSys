@@ -16,10 +16,10 @@ from agents.models import OllamaModel
 OLLAMA_HOST = "127.0.0.1"  # Ollama服务地址
 OLLAMA_PORT = 11434  # Ollama服务端口
 
-# 模型配置 - 使用qwen2.5vl:latest (多模态模型)
+# 模型配置 - 使用qwen3.5:9b (纯文本模型)
 MODEL_CONFIG = {
     "name": "qwen_vl",  # 模型名称(自定义)
-    "checkpoint": "qwen2.5vl:latest",  # Ollama模型名称
+    "checkpoint": "qwen3.5:9b",  # Ollama模型名称
     "options": {
         "temperature": 0.7,
         "num_predict": 500,

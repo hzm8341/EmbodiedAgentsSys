@@ -1,3 +1,19 @@
+[project]
+name = "embodied-agents-sys"
+version = "0.3.1"
+description = "通用具身智能机器人框架 - 支持 VLA 模型的 Agent 数字员工系统"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "hzm8341", email = "hzm8341@example.com"}
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agents*", "skills*", "msg*", "action*"]
+exclude = ["tests*", "examples*", "docs*"]
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -q"
