@@ -1,13 +1,21 @@
 """
 Conftest for VLA+ tests.
-Pre-imports agents.config_vla_plus and pins it in sys.modules to prevent
-pytest's module cleanup from causing double-import issues with the editable install.
+Ensures agents.config_vla_plus is loaded from the worktree path,
+not from the editable install, to avoid triggering ros_sugar/__init__.py.
 """
 import sys
-import os
+import importlib.util
 
-os.environ.setdefault("AGENTS_DOCS_BUILD", "1")
+WORKTREE = "/media/hzm/data_disk/EmbodiedAgentsSys/.worktrees/vla-plus"
 
-# Pre-import and pin config module to prevent double-import from editable install + PYTHONPATH
-import agents.config_vla_plus as _cfg_mod  # noqa: E402
-sys.modules["agents.config_vla_plus"] = _cfg_mod
+# Load agents.config_vla_plus directly from worktree if not already loaded by root conftest
+if "agents.config_vla_plus" not in sys.modules:
+    spec = importlib.util.spec_from_file_location(
+        "agents.config_vla_plus",
+        f"{WORKTREE}/agents/config_vla_plus.py"
+    )
+    if spec:
+        mod = importlib.util.module_from_spec(spec)
+        mod.__package__ = "agents"
+        sys.modules["agents.config_vla_plus"] = mod
+        spec.loader.exec_module(mod)

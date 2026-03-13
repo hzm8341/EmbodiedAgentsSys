@@ -1,8 +1,7 @@
 import pytest
 import numpy as np
 from unittest.mock import AsyncMock, patch, MagicMock
-from agents.components.vla_plus import VLAPlus
-from agents.config_vla_plus import VLAPlusConfig
+from agents.components.vla_plus import VLAPlus, VLAPlusConfig
 
 
 def test_vla_plus_initialization():

@@ -1,12 +1,28 @@
 import numpy as np
 import sys
-import importlib
+import importlib.util
 from typing import Dict, Any, Optional
 
-# Use importlib to ensure we get the same VLAPlusConfig instance as the caller.
-# This avoids double-import issues caused by editable installs + PYTHONPATH.
-_cfg_module = importlib.import_module('agents.config_vla_plus')
-VLAPlusConfig = _cfg_module.VLAPlusConfig
+
+def _load_config_vla_plus():
+    """Load VLAPlusConfig without triggering agents/__init__.py."""
+    if "agents.config_vla_plus" in sys.modules:
+        return sys.modules["agents.config_vla_plus"].VLAPlusConfig
+    # Load directly from file
+    import os
+    _dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    spec = importlib.util.spec_from_file_location(
+        "agents.config_vla_plus",
+        os.path.join(_dir, "config_vla_plus.py")
+    )
+    mod = importlib.util.module_from_spec(spec)
+    mod.__package__ = "agents"
+    sys.modules["agents.config_vla_plus"] = mod
+    spec.loader.exec_module(mod)
+    return mod.VLAPlusConfig
+
+
+VLAPlusConfig = _load_config_vla_plus()
 
 from .sam3_segmenter import SAM3Segmenter
 from .qwen3l_processor import Qwen3LProcessor
