@@ -6,6 +6,7 @@ VLA 驱动的机械臂到达目标位置技能。
 
 from ..vla_skill import VLASkill, SkillResult, SkillStatus
 from typing import Dict, Any, List
+import numpy as np
 
 
 class ReachSkill(VLASkill):
@@ -17,46 +18,43 @@ class ReachSkill(VLASkill):
     required_inputs: List[str] = ["target_position", "observation"]
     produced_outputs: List[str] = ["success", "actual_position"]
     max_steps: int = 30
-    position_threshold: float = 0.02  # 位置误差阈值 (m)
+    DEFAULT_POSITION_THRESHOLD: float = 0.01
 
-    def __init__(self, target_position: List[float], **kwargs):
+    def __init__(
+        self, target_position: List[float], position_threshold: float = None, **kwargs
+    ):
         """初始化到达技能
 
         Args:
             target_position: 目标位置 [x, y, z]
+            position_threshold: 位置误差阈值 (m)
             **kwargs: 其他参数
         """
         super().__init__(**kwargs)
         self.target_position = target_position
-        # 从 kwargs 获取阈值
-        self.position_threshold = kwargs.get("position_threshold", self.position_threshold)
-
-    def build_skill_token(self) -> str:
-        """构建技能令牌"""
-        return f"reach(position={self.target_position})"
-
-    def check_preconditions(self, observation: Dict) -> bool:
-        """检查执行前置条件
-
-        机械臂必须处于安全状态（无碰撞）
-        """
-        # 检查是否有碰撞检测
-        if "collision_detected" in observation:
-            return not observation["collision_detected"]
-        return True  # 默认允许执行
+        self.position_threshold = position_threshold or self.DEFAULT_POSITION_THRESHOLD
 
     def check_termination(self, observation: Dict) -> bool:
         """检查是否满足终止条件
 
-        到达目标位置（通过距离判断）
+        到达目标条件：
+        1. 末端位置到达目标位置误差 < 阈值
+        2. 显式标记到达
         """
-        # 方式1: 直接检查 position_reached 标志
-        if "position_reached" in observation:
-            return observation["position_reached"]
+        if "end_effector_pos" in observation:
+            current_pos = np.array(observation["end_effector_pos"][:3])
+            target = np.array(self.target_position[:3])
+            error = np.linalg.norm(current_pos - target)
+            if error < self.position_threshold:
+                return True
 
-        # 方式2: 通过距离判断
         if "distance_to_target" in observation:
-            return observation["distance_to_target"] < self.position_threshold
+            distance = observation["distance_to_target"]
+            if distance < self.position_threshold:
+                return True
+
+        if observation.get("position_reached", False):
+            return True
 
         return False
 

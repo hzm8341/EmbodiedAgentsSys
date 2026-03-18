@@ -39,7 +39,7 @@ class ACTVLAAdapter(VLAAdapterBase):
         self,
         observation: Dict[str, Any],
         skill_token: str,
-        termination: Optional[Dict[str, Any]] = None
+        termination: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """生成动作
 
@@ -51,17 +51,13 @@ class ACTVLAAdapter(VLAAdapterBase):
         Returns:
             动作数组
         """
-        # 提取观察
         state = self._extract_state(observation)
 
-        # 调用 ACT 模型推理
-        # 这里返回模拟结果
-        action = np.zeros(self.action_dim)
+        # TODO: Connect to local ACT inference service
+        # Replace with: action = self._model.predict(state, skill_token)
 
-        # 如果 horizon > 1，返回动作块
-        if self.horizon > 1:
-            # 返回第一个动作，其余缓存
-            action = action[: self.action_dim]
+        # Placeholder: return small random action to simulate real inference
+        action = np.random.randn(self.action_dim) * 0.01
 
         return action
 
@@ -85,11 +81,7 @@ class ACTVLAAdapter(VLAAdapterBase):
         Returns:
             执行结果
         """
-        return {
-            "status": "executed",
-            "action": action.tolist(),
-            "model": "ACT"
-        }
+        return {"status": "executed", "action": action.tolist(), "model": "ACT"}
 
     @property
     def action_dim(self) -> int:
