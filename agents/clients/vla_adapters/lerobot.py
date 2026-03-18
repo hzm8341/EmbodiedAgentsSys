@@ -37,7 +37,7 @@ class LeRobotVLAAdapter(VLAAdapterBase):
         self,
         observation: Dict[str, Any],
         skill_token: str,
-        termination: Optional[Dict[str, Any]] = None
+        termination: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """生成动作
 
@@ -49,9 +49,38 @@ class LeRobotVLAAdapter(VLAAdapterBase):
         Returns:
             动作数组
         """
-        # 调用 VLA 推理
-        # 返回动作数组（模拟实现）
-        return np.zeros(self._action_dim)
+        if self._client is None:
+            self._ensure_connection()
+
+        try:
+            from agents.clients.lerobot_transport.utils import build_inference_request
+
+            request = build_inference_request(observation, skill_token)
+
+            response = self._client.Predict(request, timeout=5.0)
+
+            return np.array(response.action[: self._action_dim])
+
+        except Exception as e:
+            import logging
+
+            logging.warning(f"VLA inference failed: {e}, using zero action")
+            return np.zeros(self._action_dim)
+
+    def _ensure_connection(self) -> None:
+        """确保 gRPC 连接已建立"""
+        try:
+            import grpc
+            from agents.clients.lerobot_transport import services_pb2_grpc
+
+            channel = grpc.insecure_channel(f"{self.host}:{self.port}")
+            self._client = services_pb2_grpc.LeRobotServiceStub(channel)
+            self._initialized = True
+        except Exception as e:
+            import logging
+
+            logging.warning(f"Failed to connect to VLA service: {e}")
+            self._client = None
 
     def execute(self, action: np.ndarray) -> Dict[str, Any]:
         """执行动作

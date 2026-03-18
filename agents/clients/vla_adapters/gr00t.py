@@ -38,7 +38,7 @@ class GR00TVLAAdapter(VLAAdapterBase):
         self,
         observation: Dict[str, Any],
         skill_token: str,
-        termination: Optional[Dict[str, Any]] = None
+        termination: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """生成动作
 
@@ -50,18 +50,15 @@ class GR00TVLAAdapter(VLAAdapterBase):
         Returns:
             动作数组
         """
-        # 提取视觉特征
         visual_features = self._extract_visual(observation)
-
-        # 提取语言指令嵌入
         language_embedding = self._encode_language(skill_token)
-
-        # 提取本体感知状态
         proprioceptive = self._extract_proprioception(observation)
 
-        # 调用 GR00T Diffusion 模型推理
-        # 这里返回模拟结果
-        action = np.zeros(self.action_dim)
+        # TODO: Connect to local GR00T inference service
+        # Replace with: action = self._model.generate(visual_features, language_embedding, proprioceptive)
+
+        # Placeholder: return small random action to simulate real inference
+        action = np.random.randn(self.action_dim) * 0.01
 
         return action
 
@@ -103,7 +100,7 @@ class GR00TVLAAdapter(VLAAdapterBase):
             "status": "executed",
             "action": action.tolist(),
             "model": "GR00T",
-            "inference_steps": self.inference_steps
+            "inference_steps": self.inference_steps,
         }
 
     @property

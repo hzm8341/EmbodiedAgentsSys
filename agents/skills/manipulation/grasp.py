@@ -18,33 +18,35 @@ class GraspSkill(VLASkill):
     produced_outputs: List[str] = ["success", "grasp_position"]
     max_steps: int = 50
 
-    def __init__(self, object_name: str, **kwargs):
+    DEFAULT_CONTACT_THRESHOLD: float = 0.5
+
+    def __init__(self, object_name: str, contact_threshold: float = None, **kwargs):
         """初始化抓取技能
 
         Args:
             object_name: 要抓取的物体名称
+            contact_threshold: 接触力阈值 (N)
             **kwargs: 其他参数
         """
         super().__init__(**kwargs)
         self.object_name = object_name
-
-    def build_skill_token(self) -> str:
-        """构建技能令牌"""
-        return f"grasp(object={self.object_name})"
-
-    def check_preconditions(self, observation: Dict) -> bool:
-        """检查执行前置条件
-
-        物体必须在视野内（检测到）
-        """
-        return observation.get("object_detected", False)
+        self._contact_threshold = contact_threshold or self.DEFAULT_CONTACT_THRESHOLD
 
     def check_termination(self, observation: Dict) -> bool:
         """检查是否满足终止条件
 
-        抓取成功（通过力传感器或夹爪状态判断）
+        抓取成功条件（满足任一即终止）：
+        1. 夹爪力超过接触阈值
+        2. 显式标记抓取成功
         """
-        return observation.get("grasp_success", False)
+        gripper_force = observation.get("gripper_force", 0.0)
+        if gripper_force > self._contact_threshold:
+            return True
+
+        if observation.get("grasp_success", False):
+            return True
+
+        return False
 
     def get_grasp_position(self) -> Dict[str, float]:
         """获取抓取位置（子类可实现）"""

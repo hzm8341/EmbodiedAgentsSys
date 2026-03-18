@@ -9,10 +9,12 @@ import asyncio
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
+import numpy as np
 
 
 class SkillStatus(Enum):
     """技能执行状态"""
+
     IDLE = "idle"
     RUNNING = "running"
     SUCCESS = "success"
@@ -22,6 +24,7 @@ class SkillStatus(Enum):
 @dataclass
 class SkillResult:
     """技能执行结果"""
+
     status: SkillStatus
     output: Any = None
     error: Optional[str] = None
@@ -34,22 +37,54 @@ class VLASkill(ABC):
     定义了 VLA 驱动技能的标准接口和行为。
     """
 
-    # 类属性：子类需要定义
     required_inputs: List[str] = []
     produced_outputs: List[str] = []
     default_vla: Optional[str] = None
     max_steps: int = 100
 
-    def __init__(self, vla_adapter=None, **kwargs):
+    def __init__(self, vla_adapter=None, ros_node=None, **kwargs):
         """初始化 VLASkill
 
         Args:
             vla_adapter: VLA 适配器实例
+            ros_node: ROS2 节点实例（可选）
             **kwargs: 其他配置参数
         """
         self.vla = vla_adapter
+        self._node = ros_node
         self._status = SkillStatus.IDLE
         self._config = kwargs
+
+        self._latest_joint_state = None
+        self._latest_image = None
+        self._gripper_force = 0.0
+
+        self._setup_subscribers()
+
+    def _setup_subscribers(self) -> None:
+        """设置 ROS2 话题订阅"""
+        if self._node is None:
+            return
+
+        try:
+            from sensor_msgs.msg import JointState, Image
+
+            self._node.create_subscription(
+                JointState, "/joint_states", self._on_joint_state, 10
+            )
+            self._node.create_subscription(
+                Image, "/camera/color/image_raw", self._on_image, 1
+            )
+        except ImportError:
+            pass
+
+    def _on_joint_state(self, msg) -> None:
+        """处理关节状态消息"""
+        self._latest_joint_state = msg
+
+    def _on_image(self, msg) -> None:
+        """处理图像消息"""
+        self._latest_image = msg
 
     @abstractmethod
     def build_skill_token(self) -> str:
@@ -99,8 +134,7 @@ class VLASkill(ABC):
             # 检查前置条件
             if not self.check_preconditions(observation):
                 return SkillResult(
-                    status=SkillStatus.FAILED,
-                    error="Preconditions not met"
+                    status=SkillStatus.FAILED, error="Preconditions not met"
                 )
 
             skill_token = self.build_skill_token()
@@ -109,8 +143,7 @@ class VLASkill(ABC):
                 # 检查终止条件
                 if self.check_termination(observation):
                     return SkillResult(
-                        status=SkillStatus.SUCCESS,
-                        output={"steps": step + 1}
+                        status=SkillStatus.SUCCESS, output={"steps": step + 1}
                     )
 
                 # VLA 推理
@@ -126,20 +159,41 @@ class VLASkill(ABC):
                 await asyncio.sleep(0.01)
 
             return SkillResult(
-                status=SkillStatus.SUCCESS,
-                output={"steps": self.max_steps}
+                status=SkillStatus.SUCCESS, output={"steps": self.max_steps}
             )
 
         except Exception as e:
             self._status = SkillStatus.FAILED
-            return SkillResult(
-                status=SkillStatus.FAILED,
-                error=str(e)
-            )
+            return SkillResult(status=SkillStatus.FAILED, error=str(e))
 
     async def _get_observation(self) -> Dict:
-        """获取观察（子类可覆盖）"""
-        return {}
+        """获取观察数据（从 ROS2 话题）"""
+        obs = {}
+
+        if self._latest_joint_state:
+            obs["joint_positions"] = list(self._latest_joint_state.position)
+            obs["joint_velocities"] = list(self._latest_joint_state.velocity)
+
+        if self._latest_image:
+            obs["image"] = self._latest_image
+
+        obs["gripper_force"] = self._gripper_force
+
+        return obs
+
+    def get_joint_positions(self) -> np.ndarray:
+        """获取当前关节位置"""
+        if self._latest_joint_state and self._latest_joint_state.position:
+            return np.array(list(self._latest_joint_state.position))
+        return np.zeros(7)
+
+    def get_end_effector_pose(self) -> np.ndarray:
+        """获取末端位姿"""
+        joints = self.get_joint_positions()
+        x = joints[0] * 0.3
+        y = joints[1] * 0.3
+        z = joints[2] * 0.3 + 0.2
+        return np.array([x, y, z, 0.0, 0.0, 0.0])
 
     @property
     def status(self) -> SkillStatus:
