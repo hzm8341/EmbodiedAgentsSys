@@ -1,17 +1,23 @@
 # agents/components/semantic_parser.py
 """语义解析器
 
-解析语音/文本指令为结构化动作。
+解析语音/文本指令为结构化动作，支持 LLM 增强和规则 fallback。
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import re
+import json
+import asyncio
 
 
 class SemanticParser:
-    """语义解析器 - 解析语音指令为结构化动作"""
+    """语义解析器 - 解析语音指令为结构化动作
 
-    # 方向映射（中 -> 英）
+    支持两种模式:
+    1. LLM 模式: 使用 Ollama 进行自然语言理解
+    2. 规则模式: 基于关键词的规则解析 (fallback)
+    """
+
     DIRECTION_MAP = {
         "前": "forward",
         "后": "backward",
@@ -21,15 +27,33 @@ class SemanticParser:
         "右": "right",
     }
 
-    # 抓取关键词
     GRASP_KEYWORDS = ["抓", "拿", "取", "拾"]
-
-    # 放置关键词
     PLACE_KEYWORDS = ["放", "置", "投", "放"]
 
-    def __init__(self):
-        """初始化语义解析器"""
-        pass
+    VALID_INTENTS = ["motion", "grasp", "place", "task", "gripper", "reach", "move"]
+
+    def __init__(self, use_llm: bool = True, ollama_model: str = "qwen2.5:3b"):
+        """初始化语义解析器
+
+        Args:
+            use_llm: 是否使用 LLM 增强解析
+            ollama_model: Ollama 模型名称
+        """
+        self.use_llm = use_llm
+        self._ollama_client = None
+        self._ollama_model = ollama_model
+
+        if use_llm:
+            self._init_ollama()
+
+    def _init_ollama(self) -> None:
+        """初始化 Ollama 客户端"""
+        try:
+            from ollama import Client
+
+            self._ollama_client = Client(host="http://127.0.0.1:11434")
+        except Exception:
+            self.use_llm = False
 
     def parse(self, text: str) -> Dict[str, Any]:
         """解析文本为结构化指令
@@ -49,6 +73,43 @@ class SemanticParser:
         params = self._parse_params(text)
 
         return {"intent": intent, **params}
+
+    async def parse_async(self, text: str) -> Dict[str, Any]:
+        """异步解析文本为结构化指令 (LLM 增强)
+
+        Args:
+            text: 输入文本
+
+        Returns:
+            包含 intent 和参数的字典
+        """
+        if self.use_llm and self._ollama_client:
+            try:
+                result = await self._llm_parse(text)
+                if result:
+                    return result
+            except Exception:
+                pass
+        return self.parse(text)
+
+    async def _llm_parse(self, text: str) -> Optional[Dict[str, Any]]:
+        """使用 LLM 解析指令"""
+        prompt = f"""将以下机器人操作指令解析为JSON格式。
+输出格式: {{"intent": "motion|grasp|place|task|gripper|reach|move", "params": {{...}}}}
+指令: {text}
+只输出JSON，不要其他内容:"""
+
+        try:
+            response = self._ollama_client.generate(
+                model=self._ollama_model, prompt=prompt, options={"num_predict": 128}
+            )
+            response_text = response.get("response", "").strip()
+            parsed = json.loads(response_text)
+            if parsed.get("intent") in self.VALID_INTENTS:
+                return parsed
+        except Exception:
+            pass
+        return None
 
     def _parse_intent(self, text: str) -> str:
         """解析意图类型"""

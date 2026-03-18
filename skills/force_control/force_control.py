@@ -11,9 +11,10 @@ import numpy as np
 
 class ForceControlMode(Enum):
     """力控模式"""
-    POSITION = "position"      # 位置模式
-    FORCE = "force"           # 力控模式
-    HYBRID = "hybrid"         # 位置/力混合模式
+
+    POSITION = "position"  # 位置模式
+    FORCE = "force"  # 力控模式
+    HYBRID = "hybrid"  # 位置/力混合模式
     COMPLIANCE = "compliance"  # 柔顺模式
 
 
@@ -27,7 +28,9 @@ class ForceController:
         self,
         max_force: float = 10.0,
         contact_threshold: float = 0.5,
-        stiffness: float = 500.0
+        stiffness: float = 500.0,
+        ros_node=None,
+        sensor_topic: str = "/ft_sensor/raw",
     ):
         """初始化力控制器
 
@@ -35,12 +38,50 @@ class ForceController:
             max_force: 最大允许力 (N)
             contact_threshold: 接触检测阈值 (N)
             stiffness: 刚度 (N/m)
+            ros_node: ROS2 节点实例
+            sensor_topic: 力传感器话题名称
         """
         self.max_force = max_force
         self.contact_threshold = contact_threshold
         self.stiffness = stiffness
         self._mode = ForceControlMode.POSITION
-        self._current_force = np.zeros(6)  # 6轴力/力矩
+        self._current_force = np.zeros(6)
+        self._raw_force = np.zeros(6)
+
+        self._node = ros_node
+        self._sensor_topic = sensor_topic
+        self._force_subscriber = None
+
+        if ros_node:
+            self._setup_force_subscriber()
+
+    def _setup_force_subscriber(self) -> None:
+        """设置力传感器话题订阅"""
+        try:
+            from geometry_msgs.msg import WrenchStamped
+
+            self._force_subscriber = self._node.create_subscription(
+                WrenchStamped, self._sensor_topic, self._force_callback, 10
+            )
+        except ImportError:
+            pass
+
+    def _force_callback(self, msg) -> None:
+        """处理力传感器消息"""
+        w = msg.wrench
+        self._raw_force = np.array([
+            w.force.x,
+            w.force.y,
+            w.force.z,
+            w.torque.x,
+            w.torque.y,
+            w.torque.z,
+        ])
+        self.read_force_sensor(self._raw_force)
+
+    def get_current_force(self) -> np.ndarray:
+        """获取当前滤波后的力/力矩"""
+        return self._current_force.copy()
 
     @property
     def mode(self) -> ForceControlMode:
@@ -143,7 +184,7 @@ class ForceController:
             return {
                 "status": "contact",
                 "displacement": displacement.tolist(),
-                "mode": self._mode.value
+                "mode": self._mode.value,
             }
 
         # 施加目标力
@@ -152,5 +193,5 @@ class ForceController:
         return {
             "status": "applied",
             "force": self._current_force.tolist(),
-            "mode": self._mode.value
+            "mode": self._mode.value,
         }
