@@ -66,15 +66,19 @@
 | ReachSkill | 到达技能 | ✅ |
 | MoveSkill | 关节运动技能 | ✅ |
 | InspectSkill | 检查/识别技能 | ✅ |
+| AssemblySkill | 装配技能 | ✅ |
+| Perception3DSkill | 3D 感知技能 | ✅ |
 
 ### 组件
 
 | 组件 | 说明 | 状态 |
 |------|------|------|
 | VoiceCommand | 语音命令理解 | ✅ |
-| SemanticParser | 语义解析器 | ✅ |
-| TaskPlanner | 任务规划器 | ✅ |
+| SemanticParser | 语义解析器 (LLM 增强) | ✅ |
+| TaskPlanner | 任务规划器 (带执行记忆) | ✅ |
 | EventBus | 事件总线 | ✅ |
+| DistributedEventBus | 分布式事件总线 | ✅ |
+| SkillGenerator | Skill 代码生成器 | ✅ |
 
 ### 工具
 
@@ -355,19 +359,16 @@ print(f"Skills: {task.skills}")
 ```python
 from agents.components.semantic_parser import SemanticParser
 
-parser = SemanticParser()
+# 使用 LLM 增强解析
+parser = SemanticParser(use_llm=True, ollama_model="qwen2.5:3b")
 
-# 解析运动指令
+# 同步解析 (规则模式)
 result = parser.parse("向前20厘米")
 # {'intent': 'motion', 'direction': 'forward', 'distance': 0.2}
 
-# 解析抓取指令
-result = parser.parse("抓取杯子")
-# {'intent': 'grasp'}
-
-# 解析放置指令
-result = parser.parse("放到桌子上")
-# {'intent': 'place'}
+# 异步解析 (LLM 模式)
+result = await parser.parse_async("帮我把那个圆形零件移过去")
+# {'intent': 'motion', 'params': {'direction': 'forward', ...}}
 ```
 
 ### 7. 力控模块使用
@@ -421,6 +422,55 @@ asyncio.create_task(processor.process(handler))
 result = await processor.add(item)
 ```
 
+### 9. SkillGenerator 使用
+
+```python
+from skills.teaching.skill_generator import SkillGenerator
+
+generator = SkillGenerator(output_dir="./generated_skills", _simulated=False)
+
+# 从示教动作生成 Skill
+teaching_action = {
+    "action_id": "demo_001",
+    "name": "pick_and_place",
+    "frames": [
+        {"joint_positions": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]},
+        {"joint_positions": [0.5, 0.2, 0.1, 0.0, 0.0, 0.0, 0.0]},
+    ]
+}
+
+result = await generator.generate_skill(
+    teaching_action=teaching_action,
+    skill_name="demo_pick_place"
+)
+
+# 导出到文件
+export_result = await generator.export_skill(result["skill_id"])
+# 生成可执行的 Python 文件
+```
+
+### 10. 分布式事件总线 (多机器人协作)
+
+```python
+from agents.events.bus import DistributedEventBus
+
+# 创建分布式事件总线 (需要 ROS2 节点)
+bus = DistributedEventBus(ros_node=my_ros_node, namespace="/robots/events")
+
+# 订阅事件
+async def on_robot_status(event):
+    print(f"Robot status: {event.data}")
+
+bus.subscribe("robot.status", on_robot_status)
+
+# 发布事件 (自动广播到其他 ROS2 节点)
+await bus.publish(Event(
+    type="robot.status",
+    source="robot_1",
+    data={"status": "working", "battery": 85}
+))
+```
+
 ---
 
 ## 配置文件
@@ -449,11 +499,12 @@ skills:
 ```
 agents/
 ├── clients/
-│   └── vla_adapters/      # VLA 适配器
-│       ├── base.py
-│       ├── lerobot.py
-│       ├── act.py
-│       └── gr00t.py
+│   ├── vla_adapters/      # VLA 适配器
+│   │   ├── base.py
+│   │   ├── lerobot.py
+│   │   ├── act.py
+│   │   └── gr00t.py
+│   └── ollama.py          # Ollama LLM 客户端
 ├── components/            # 组件
 │   ├── voice_command.py
 │   ├── semantic_parser.py
@@ -467,20 +518,23 @@ agents/
 │       ├── move.py
 │       └── inspect.py
 ├── events/               # 事件系统
-│   └── bus.py
+│   └── bus.py            # EventBus + DistributedEventBus
 └── utils/               # 工具类
     └── performance.py
 
 skills/
 ├── force_control/       # 力控模块
 │   └── force_control.py
-└── vision/             # 视觉技能
-    └── perception_skill.py
+├── vision/             # 视觉技能
+│   └── perception_3d_skill.py
+└── teaching/           # 示教模块
+    └── skill_generator.py
 
 tests/                   # 测试
 docs/
 ├── api/                 # API 文档
-└── guides/              # 使用指南
+├── guides/              # 使用指南
+└── plans/               # 开发计划
 ```
 
 ---
