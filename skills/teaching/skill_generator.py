@@ -12,16 +12,16 @@ SkillGenerator - Skill生成器
 
 使用示例:
     from skills.teaching.skill_generator import SkillGenerator
-    
+
     generator = SkillGenerator()
-    
+
     # 从示教动作生成Skill
     result = await generator.execute(
         action="generate_skill",
         teaching_action=teaching_action,
         skill_name="pick_and_place"
     )
-    
+
     # 生成参数化Skill
     result = await generator.execute(
         action="generate_parametric",
@@ -40,16 +40,18 @@ from enum import Enum
 
 class GeneratorAction(Enum):
     """生成器动作"""
-    GENERATE_SKILL = "generate_skill"           # 生成Skill
-    GENERATE_PARAMETRIC = "generate_parametric"   # 生成参数化Skill
-    GENERATE_WRAPPER = "generate_wrapper"        # 生成包装器
-    VALIDATE_SKILL = "validate_skill"           # 验证Skill
-    EXPORT_SKILL = "export_skill"               # 导出Skill
+
+    GENERATE_SKILL = "generate_skill"  # 生成Skill
+    GENERATE_PARAMETRIC = "generate_parametric"  # 生成参数化Skill
+    GENERATE_WRAPPER = "generate_wrapper"  # 生成包装器
+    VALIDATE_SKILL = "validate_skill"  # 验证Skill
+    EXPORT_SKILL = "export_skill"  # 导出Skill
 
 
 @dataclass
 class SkillTemplate:
     """Skill代码模板"""
+
     name: str
     description: str
     category: str
@@ -62,23 +64,24 @@ class SkillTemplate:
 @dataclass
 class GeneratedSkill:
     """生成的Skill"""
+
     skill_id: str
     name: str
     description: str
     category: str
     source_teaching_id: Optional[str] = None
-    
+
     # 代码
     skill_code: str = ""
     test_code: str = ""
-    
+
     # 元数据
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     # 参数化信息
     is_parametric: bool = False
     parameters: List[Dict[str, Any]] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
@@ -91,21 +94,21 @@ class GeneratedSkill:
             "test_code": self.test_code,
             "metadata": self.metadata,
             "is_parametric": self.is_parametric,
-            "parameters": self.parameters
+            "parameters": self.parameters,
         }
 
 
 class SkillGenerator:
     """
     Skill生成器 - 根据示教动作生成可复用的Skill代码
-    
+
     功能:
     1. 从示教动作生成基础Skill
     2. 参数化处理，支持可变参数
     3. 生成测试代码
     4. 导出Skill到文件
     """
-    
+
     # 基础Skill模板
     BASE_SKILL_TEMPLATE = '''"""
 {skill_name} - 自动生成的Skill
@@ -278,28 +281,24 @@ async def test_{skill_name}_validation():
     # 应该能处理并返回结果
 '''
 
-    def __init__(
-        self,
-        output_dir: str = "./generated_skills",
-        _simulated: bool = True
-    ):
+    def __init__(self, output_dir: str = "./generated_skills", _simulated: bool = True):
         """
         初始化生成器
-        
+
         Args:
             output_dir: 输出目录
             _simulated: 是否使用模拟模式
         """
         self.output_dir = output_dir
         self._simulated = _simulated
-        
+
         # 生成的Skills
         self._generated_skills: Dict[str, GeneratedSkill] = {}
-        
+
         # 内置模板
         self._templates: Dict[str, SkillTemplate] = {}
         self._register_default_templates()
-    
+
     def _register_default_templates(self):
         """注册默认模板"""
         self._templates = {
@@ -309,25 +308,33 @@ async def test_{skill_name}_validation():
                 category="manipulation",
                 input_params=[
                     {"name": "target_object", "type": "str", "required": True},
-                    {"name": "target_position", "type": "List[float]", "required": True},
+                    {
+                        "name": "target_position",
+                        "type": "List[float]",
+                        "required": True,
+                    },
                 ],
                 output_params=[
                     {"name": "success", "type": "bool"},
                     {"name": "final_position", "type": "List[float]"},
-                ]
+                ],
             ),
             "move_sequence": SkillTemplate(
                 name="move_sequence",
                 description="移动序列动作",
                 category="motion",
                 input_params=[
-                    {"name": "positions", "type": "List[List[float]]", "required": True},
+                    {
+                        "name": "positions",
+                        "type": "List[List[float]]",
+                        "required": True,
+                    },
                     {"name": "speed", "type": "float", "default": 1.0},
                 ],
                 output_params=[
                     {"name": "success", "type": "bool"},
                     {"name": "reached_positions", "type": "List[List[float]]"},
-                ]
+                ],
             ),
             "assembly": SkillTemplate(
                 name="assembly",
@@ -341,18 +348,18 @@ async def test_{skill_name}_validation():
                 output_params=[
                     {"name": "success", "type": "bool"},
                     {"name": "assembly_quality", "type": "str"},
-                ]
-            )
+                ],
+            ),
         }
-    
+
     async def execute(self, action: str, **params) -> Dict[str, Any]:
         """
         执行生成器动作
-        
+
         Args:
             action: 动作类型
             **params: 动作参数
-            
+
         Returns:
             生成结果
         """
@@ -365,23 +372,23 @@ async def test_{skill_name}_validation():
             "list_templates": self.list_templates,
             "list_generated": self.list_generated_skills,
         }
-        
+
         if action in action_map:
             return await action_map[action](**params)
         else:
             return {"success": False, "error": f"Unknown action: {action}"}
-    
+
     async def generate_skill(
         self,
         teaching_action: Dict[str, Any] = None,
         skill_name: str = None,
         description: str = None,
         template: str = "default",
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         从示教动作生成Skill
-        
+
         Args:
             teaching_action: 示教动作数据
             skill_name: Skill名称
@@ -390,111 +397,124 @@ async def test_{skill_name}_validation():
         """
         # 生成唯一ID
         skill_id = str(uuid.uuid4())[:8]
-        
+
         # 确定名称和描述
-        name = skill_name or teaching_action.get("name", "generated_skill") if teaching_action else "generated_skill"
-        desc = description or teaching_action.get("description", "自动生成的Skill") if teaching_action else "自动生成的Skill"
-        
+        name = (
+            skill_name or teaching_action.get("name", "generated_skill")
+            if teaching_action
+            else "generated_skill"
+        )
+        desc = (
+            description or teaching_action.get("description", "自动生成的Skill")
+            if teaching_action
+            else "自动生成的Skill"
+        )
+
         # 获取帧数据用于生成代码
         frames = []
         if teaching_action and "frames" in teaching_action:
             frames = teaching_action["frames"]
-        
+
         # 生成Skill代码
         class_name = self._to_class_name(name)
-        
+
         # 生成配置字段
         config_fields = self._generate_config_fields(frames, teaching_action)
-        
+
         # 生成输入/输出描述
         input_desc = self._generate_input_description(frames)
         output_desc = self._generate_output_description(frames)
         execute_params = self._generate_execute_params(frames)
-        
+
         # 生成代码
         skill_code = self.BASE_SKILL_TEMPLATE.format(
             skill_name=name,
             class_name=class_name,
             description=desc,
-            source_teaching_id=teaching_action.get("action_id", "unknown") if teaching_action else "unknown",
+            source_teaching_id=teaching_action.get("action_id", "unknown")
+            if teaching_action
+            else "unknown",
             config_fields=config_fields,
             input_descriptions=input_desc,
             output_descriptions=output_desc,
             execute_params_doc=execute_params,
             execute_body=self._generate_execute_body(frames),
             validate_body=self._generate_validate_body(frames),
-            return_fields=self._generate_return_fields(frames)
+            return_fields=self._generate_return_fields(frames),
         )
-        
+
         # 生成测试代码
         test_code = self._generate_test_code(name, class_name, frames)
-        
+
         # 创建生成的Skill
         generated = GeneratedSkill(
             skill_id=skill_id,
             name=name,
             description=desc,
             category="generated",
-            source_teaching_id=teaching_action.get("action_id") if teaching_action else None,
+            source_teaching_id=teaching_action.get("action_id")
+            if teaching_action
+            else None,
             skill_code=skill_code,
             test_code=test_code,
-            metadata={
-                "frame_count": len(frames),
-                "generated_at": "now"
-            },
-            is_parametric=False
+            metadata={"frame_count": len(frames), "generated_at": "now"},
+            is_parametric=False,
         )
-        
+
         # 保存
         self._generated_skills[skill_id] = generated
-        
+
         return {
             "success": True,
             "action": "generate_skill",
             "skill_id": skill_id,
             "name": name,
             "class_name": class_name,
-            "code_preview": skill_code[:500] + "..." if len(skill_code) > 500 else skill_code
+            "code_preview": skill_code[:500] + "..."
+            if len(skill_code) > 500
+            else skill_code,
         }
-    
+
     async def generate_parametric(
         self,
         base_action: Dict[str, Any] = None,
         parameters: List[str] = None,
         skill_name: str = None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         生成参数化Skill
-        
+
         Args:
             base_action: 基础示教动作
             parameters: 要参数化的变量列表
             skill_name: Skill名称
         """
         skill_id = str(uuid.uuid4())[:8]
-        
-        name = skill_name or f"{base_action.get('name', 'skill')}_parametric" if base_action else "parametric_skill"
+
+        name = (
+            skill_name or f"{base_action.get('name', 'skill')}_parametric"
+            if base_action
+            else "parametric_skill"
+        )
         desc = f"参数化的{name}"
-        
+
         class_name = self._to_class_name(name)
-        
+
         # 处理参数
         param_list = []
         config_fields = ""
         param_execute_body = ""
-        
+
         if parameters:
             for param in parameters:
-                param_list.append({
-                    "name": param,
-                    "type": "Any",
-                    "required": False
-                })
+                param_list.append({"name": param, "type": "Any", "required": False})
                 config_fields += f"    {param}: Any = None\n"
                 param_execute_body += f"        # 使用参数: {param}\n"
-                param_execute_body += f"        # value = merged_params.get('{param}')\n"
-        
+                param_execute_body += (
+                    f"        # value = merged_params.get('{param}')\n"
+                )
+
         # 生成参数化代码
         skill_code = self.PARAMETRIC_SKILL_TEMPLATE.format(
             skill_name=name,
@@ -504,12 +524,12 @@ async def test_{skill_name}_validation():
             config_fields=config_fields or "    pass",
             execute_params_doc="        **params: 执行参数",
             param_execute_body=param_execute_body or "        pass",
-            return_fields="            \"status\": \"completed\""
+            return_fields='            "status": "completed"',
         )
-        
+
         # 生成测试代码
         test_code = self._generate_test_code(name, class_name, [])
-        
+
         generated = GeneratedSkill(
             skill_id=skill_id,
             name=name,
@@ -519,11 +539,11 @@ async def test_{skill_name}_validation():
             skill_code=skill_code,
             test_code=test_code,
             is_parametric=True,
-            parameters=param_list
+            parameters=param_list,
         )
-        
+
         self._generated_skills[skill_id] = generated
-        
+
         return {
             "success": True,
             "action": "generate_parametric",
@@ -531,19 +551,16 @@ async def test_{skill_name}_validation():
             "name": name,
             "is_parametric": True,
             "parameters": param_list,
-            "code_preview": skill_code[:500] + "..."
+            "code_preview": skill_code[:500] + "...",
         }
-    
+
     async def generate_wrapper(
-        self,
-        skill_name: str,
-        wrapper_name: str = None,
-        **kwargs
+        self, skill_name: str, wrapper_name: str = None, **kwargs
     ) -> Dict[str, Any]:
         """生成包装器"""
         # 简单的包装器生成
         class_name = self._to_class_name(wrapper_name or f"{skill_name}_wrapper")
-        
+
         wrapper_code = f'''"""
 {class_name} - {skill_name}的包装器
 """
@@ -562,32 +579,29 @@ class {class_name}:
             return await self.wrapped_skill.execute(**params)
         return {{"success": False, "error": "No wrapped skill"}}
 '''
-        
+
         skill_id = str(uuid.uuid4())[:8]
-        
+
         generated = GeneratedSkill(
             skill_id=skill_id,
             name=class_name,
             description=f"{skill_name}的包装器",
             category="wrapper",
             skill_code=wrapper_code,
-            is_parametric=False
+            is_parametric=False,
         )
-        
+
         self._generated_skills[skill_id] = generated
-        
+
         return {
             "success": True,
             "action": "generate_wrapper",
             "skill_id": skill_id,
-            "class_name": class_name
+            "class_name": class_name,
         }
-    
+
     async def validate_skill(
-        self,
-        skill_code: str = None,
-        skill_id: str = None,
-        **kwargs
+        self, skill_code: str = None, skill_id: str = None, **kwargs
     ) -> Dict[str, Any]:
         """验证生成的Skill代码"""
         if skill_id and skill_id in self._generated_skills:
@@ -597,54 +611,58 @@ class {class_name}:
             code = skill_code
         else:
             return {"success": False, "error": "No code to validate"}
-        
+
         # 简单的语法检查
         validation_results = {
             "has_class": "class " in code,
             "has_execute": "async def execute" in code or "def execute" in code,
             "has_init": "def __init__" in code,
-            "has_return": "return" in code
+            "has_return": "return" in code,
         }
-        
+
         all_passed = all(validation_results.values())
-        
+
         return {
             "success": True,
             "action": "validate_skill",
             "valid": all_passed,
-            "checks": validation_results
+            "checks": validation_results,
         }
-    
+
     async def export_skill(
-        self,
-        skill_id: str,
-        filename: str = None,
-        **kwargs
+        self, skill_id: str, filename: str = None, **kwargs
     ) -> Dict[str, Any]:
-        """导出Skill到文件"""
+        """导出Skill到文件 (实际写入)"""
         if skill_id not in self._generated_skills:
             return {"success": False, "error": f"Skill {skill_id} not found"}
-        
+
         skill = self._generated_skills[skill_id]
-        
-        # 确定文件名
+
         if filename is None:
             filename = f"{skill.name}.py"
-        
-        if self._simulated:
-            # 模拟模式
-            return {
-                "success": True,
-                "action": "export_skill",
-                "skill_id": skill_id,
-                "filename": filename,
-                "code_length": len(skill.skill_code),
-                "message": f"Simulated export to {filename}"
-            }
-        else:
-            # TODO: 实际保存文件
-            pass
-    
+
+        import os
+
+        os.makedirs(self.output_dir, exist_ok=True)
+        filepath = os.path.join(self.output_dir, filename)
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(skill.skill_code)
+
+        test_filename = f"test_{skill.name}.py"
+        test_filepath = os.path.join(self.output_dir, test_filename)
+
+        with open(test_filepath, "w", encoding="utf-8") as f:
+            f.write(skill.test_code)
+
+        return {
+            "success": True,
+            "action": "export_skill",
+            "skill_id": skill_id,
+            "filepath": filepath,
+            "test_filepath": test_filepath,
+        }
+
     async def list_templates(self, **kwargs) -> Dict[str, Any]:
         """列出可用模板"""
         templates = []
@@ -654,15 +672,11 @@ class {class_name}:
                 "description": template.description,
                 "category": template.category,
                 "input_params": template.input_params,
-                "output_params": template.output_params
+                "output_params": template.output_params,
             })
-        
-        return {
-            "success": True,
-            "templates": templates,
-            "count": len(templates)
-        }
-    
+
+        return {"success": True, "templates": templates, "count": len(templates)}
+
     async def list_generated_skills(self, **kwargs) -> Dict[str, Any]:
         """列出已生成的Skills"""
         skills = []
@@ -673,77 +687,83 @@ class {class_name}:
                 "description": skill.description,
                 "category": skill.category,
                 "is_parametric": skill.is_parametric,
-                "source_teaching_id": skill.source_teaching_id
+                "source_teaching_id": skill.source_teaching_id,
             })
-        
-        return {
-            "success": True,
-            "skills": skills,
-            "count": len(skills)
-        }
-    
+
+        return {"success": True, "skills": skills, "count": len(skills)}
+
     def _to_class_name(self, name: str) -> str:
         """转换为类名"""
         # 替换特殊字符为空格，然后按空格分割，取每个单词的首字母大写
-        name = re.sub(r'[^a-zA-Z0-9\u4e00-\u9fff]', ' ', name)
+        name = re.sub(r"[^a-zA-Z0-9\u4e00-\u9fff]", " ", name)
         parts = name.split()
-        return ''.join(p.capitalize() for p in parts if p) + "Skill"
-    
+        return "".join(p.capitalize() for p in parts if p) + "Skill"
+
     def _generate_config_fields(self, frames: List[Dict], action: Dict = None) -> str:
         """生成配置字段"""
         if not frames:
             return "    pass"
-        
+
         # 从帧数据提取关节数量等信息
         joint_count = 0
         if frames and "joint_positions" in frames[0]:
             joint_count = len(frames[0].get("joint_positions", []))
-        
+
         fields = f"    joint_count: int = {joint_count}\n"
         fields += f"    frame_count: int = {len(frames)}\n"
-        
+
         if action:
             fields += f"    duration: float = {action.get('duration', 0.0)}\n"
-        
+
         return fields
-    
+
     def _generate_input_description(self, frames: List[Dict]) -> str:
         """生成输入参数描述"""
         return "    - params: 执行参数"
-    
+
     def _generate_output_description(self, frames: List[Dict]) -> str:
         """生成输出参数描述"""
         return "    - result: 执行结果字典"
-    
+
     def _generate_execute_params(self, frames: List[Dict]) -> str:
         """生成执行参数文档"""
         return "        **params: Skill执行参数"
-    
+
     def _generate_execute_body(self, frames: List[Dict]) -> str:
-        """生成执行函数体"""
+        """生成执行函数体 (可运行代码)"""
         if not frames:
             return "        pass"
-        
-        # 简单的模拟执行
-        return "        # 从示教动作生成的执行逻辑\n        # 遍历关键帧并执行\n        for frame in frames:\n            # 执行每一帧\n            pass"
-    
-        return "        # 从示教动作生成的执行逻辑\n        # 遍历关键帧并执行\n        for frame in frames:\n            # 执行每一帧\n            pass"
-    
+
+        keyframes_data = []
+        for f in frames:
+            if "joint_positions" in f:
+                keyframes_data.append(f["joint_positions"])
+
+        if not keyframes_data:
+            return "        # 从示教动作生成的执行逻辑\n        for frame in frames:\n            pass"
+
+        keyframes_str = json.dumps(keyframes_data)
+        return f"""
+        import numpy as np
+        keyframes = {keyframes_str}
+        for positions in keyframes:
+            msg = self._build_joint_trajectory(positions, duration=0.5)
+            self._joint_pub.publish(msg)
+            await asyncio.sleep(0.5)
+        """
+
     def _generate_validate_body(self, frames: List[Dict]) -> str:
         """生成验证函数体"""
         if not frames:
             return "        return True"
         return "        # 验证必要参数\n        return True"
-    
+
     def _generate_return_fields(self, frames: List[Dict]) -> str:
         """生成返回字段"""
         return '            "status": "completed"'
-    
+
     def _generate_test_code(
-        self,
-        skill_name: str,
-        class_name: str,
-        frames: List[Dict]
+        self, skill_name: str, class_name: str, frames: List[Dict]
     ) -> str:
         """生成测试代码"""
         return self.TEST_TEMPLATE.format(
@@ -751,18 +771,14 @@ class {class_name}:
             class_name=class_name,
             module_name=skill_name.lower().replace(" ", "_"),
             test_execute_args="()",
-            test_validation_args="()"
+            test_validation_args="()",
         )
 
 
 def create_skill_generator(
-    output_dir: str = "./generated_skills",
-    simulated: bool = True
+    output_dir: str = "./generated_skills", simulated: bool = True
 ) -> SkillGenerator:
     """
     工厂函数: 创建SkillGenerator实例
     """
-    return SkillGenerator(
-        output_dir=output_dir,
-        _simulated=simulated
-    )
+    return SkillGenerator(output_dir=output_dir, _simulated=simulated)

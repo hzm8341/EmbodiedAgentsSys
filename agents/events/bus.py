@@ -2,6 +2,7 @@
 """Event Bus 事件总线
 
 提供事件发布/订阅功能，支持组件间的松耦合通信。
+支持分布式多机器人协作（ROS2话题桥接）。
 """
 
 from enum import Enum
@@ -9,10 +10,12 @@ from typing import Callable, Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 import asyncio
+import json
 
 
 class EventPriority(Enum):
     """事件优先级"""
+
     LOW = 0
     NORMAL = 1
     HIGH = 2
@@ -72,7 +75,9 @@ class EventBus:
             self._priority_subscribers[event_type] = []
         self._priority_subscribers[event_type].append((priority, callback))
         # 按优先级排序
-        self._priority_subscribers[event_type].sort(key=lambda x: x[0].value, reverse=True)
+        self._priority_subscribers[event_type].sort(
+            key=lambda x: x[0].value, reverse=True
+        )
 
     def unsubscribe(self, event_type: str, callback: Callable) -> None:
         """取消订阅
@@ -172,3 +177,79 @@ def reset_event_bus() -> None:
     """重置全局事件总线"""
     global _global_bus
     _global_bus = None
+
+
+class DistributedEventBus(EventBus):
+    """分布式事件总线
+
+    扩展 EventBus，支持跨 ROS2 节点的事件广播。
+    用于多机器人协作场景。
+    """
+
+    def __init__(self, ros_node=None, namespace: str = "/agents/events"):
+        """初始化分布式事件总线
+
+        Args:
+            ros_node: ROS2 节点实例
+            namespace: ROS2 话题命名空间
+        """
+        super().__init__()
+        self._ros_node = ros_node
+        self._namespace = namespace
+        self._publisher = None
+
+        if ros_node:
+            self._setup_ros_bridge()
+
+    def _setup_ros_bridge(self) -> None:
+        """设置 ROS2 话题桥接"""
+        try:
+            from std_msgs.msg import String
+
+            self._publisher = self._ros_node.create_publisher(
+                String, f"{self._namespace}/broadcast", 10
+            )
+            self._ros_node.create_subscription(
+                String,
+                f"{self._namespace}/broadcast",
+                self._on_remote_event,
+                10,
+            )
+        except ImportError:
+            pass
+
+    def _on_remote_event(self, msg) -> None:
+        """处理远程事件"""
+        try:
+            data = json.loads(msg.data)
+            remote_event = Event(
+                type=data.get("type", ""),
+                source=data.get("source", "remote"),
+                data=data.get("data"),
+            )
+            asyncio.create_task(self.publish(remote_event))
+        except Exception:
+            pass
+
+    async def publish(self, event: Event) -> None:
+        """发布事件 (含 ROS2 广播)
+
+        Args:
+            event: 事件对象
+        """
+        await super().publish(event)
+
+        if self._publisher:
+            try:
+                from std_msgs.msg import String
+
+                msg = String(
+                    data=json.dumps({
+                        "type": event.type,
+                        "source": event.source,
+                        "data": str(event.data),
+                    })
+                )
+                self._publisher.publish(msg)
+            except Exception:
+                pass
