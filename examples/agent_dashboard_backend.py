@@ -91,7 +91,15 @@ async def healthz():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    response_text = f"收到消息: {request.message}"
+    try:
+        response = await asyncio.to_thread(
+            ollama.chat,
+            model="qwen3.5:latest",
+            messages=[{"role": "user", "content": request.message}],
+        )
+        response_text = response["message"]["content"]
+    except Exception as e:
+        response_text = f"模型调用失败: {e}"
     return ChatResponse(response=response_text, timestamp=datetime.now())
 
 

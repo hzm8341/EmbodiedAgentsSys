@@ -1,10 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../store/useChatStore'
-import { useSettingsStore } from '../store/useSettingsStore'
 
 export const ChatPanel = () => {
   const { messages, isTyping, addMessage, setTyping } = useChatStore()
-  const { apiUrl } = useSettingsStore()
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -24,7 +22,7 @@ export const ChatPanel = () => {
     setTyping(true)
 
     try {
-      const response = await fetch(`${apiUrl}/chat`, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: inputValue }),
