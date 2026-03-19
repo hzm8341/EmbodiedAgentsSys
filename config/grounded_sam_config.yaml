@@ -1,0 +1,7 @@
+grounded_sam:
+  dino_model_path: "models/groundingdino_swint_ogc.pth"
+  sam_model_path: "models/sam_vit_h_4b8939.pth"
+  device: "cuda"
+  box_threshold: 0.35
+  text_threshold: 0.25
+  nms_threshold: 0.8
