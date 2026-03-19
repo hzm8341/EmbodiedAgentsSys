@@ -543,6 +543,16 @@ docs/
 
 Agent Dashboard 提供实时摄像头预览、场景描述和目标检测功能，基于 React + FastAPI 构建，使用本地 Ollama `qwen2.5vl` 视觉模型进行推理。
 
+### Demo 效果
+
+<div align="center">
+<img src="docs/_static/dashboard_demo_1.png" alt="场景分析面板 - 场景描述与物体检测" width="800"/>
+<p><em>场景分析面板：实时画面预览 + qwen2.5vl 场景描述 + 目标检测置信度</em></p>
+
+<img src="docs/_static/dashboard_demo_2.png" alt="场景分析面板 - 多物体检测结果" width="800"/>
+<p><em>检测结果：自动识别办公桌面上的电脑显示器、文件夹、电脑等物体</em></p>
+</div>
+
 ### 前置条件
 
 - USB 摄像头已连接（默认 `/dev/video0`）
