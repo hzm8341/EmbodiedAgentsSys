@@ -130,13 +130,19 @@ if not _is_ros_available():
 
     # Directly load submodules that tests actually need (skip if not yet created)
     import os
+    MAIN_REPO_COMPONENTS = "/media/hzm/data_disk/EmbodiedAgentsSys/agents/components"
     for submod_name, filename in [
         ("agents.components.data_structures", "data_structures.py"),
+        ("agents.components.collision_checker", "collision_checker.py"),
         ("agents.components.sam3_segmenter", "sam3_segmenter.py"),
         ("agents.components.qwen3l_processor", "qwen3l_processor.py"),
         ("agents.components.vla_plus", "vla_plus.py"),
+        ("agents.components.grounded_sam", "grounded_sam.py"),
     ]:
+        # Try worktree first, then fall back to main repo
         path = f"{WORKTREE}/agents/components/{filename}"
+        if not os.path.exists(path):
+            path = f"{MAIN_REPO_COMPONENTS}/{filename}"
         if not os.path.exists(path):
             continue
         mod = _load_module_directly(submod_name, path)
