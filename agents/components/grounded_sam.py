@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import List, Literal, Optional, Tuple
 import numpy as np
 
+__all__ = ["GroundedSAMResult", "GroundedSAMSegmenter"]
+
 
 @dataclass
 class GroundedSAMResult:
@@ -150,7 +152,7 @@ class GroundedSAMSegmenter:
             [labels[k] for k in keep],
         )
 
-    async def segment(
+    def segment(
         self,
         image: np.ndarray,
         text_query: str,
@@ -203,7 +205,7 @@ class _MockDINO:
         text_query: str,
         box_thr: float,
         text_thr: float,
-    ) -> tuple:
+    ) -> Tuple[List[Tuple[float, float, float, float]], List[float], List[str]]:
         h, w = image.shape[:2]
         label = text_query.split(" . ")[0]
         return (

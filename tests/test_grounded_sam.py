@@ -1,5 +1,3 @@
-import asyncio
-
 import numpy as np
 
 from agents.components.grounded_sam import GroundedSAMResult, GroundedSAMSegmenter
@@ -48,7 +46,7 @@ def test_segmenter_grasp_mode_returns_single_mask():
         sam_model_path="mock",
         device="cpu",
     )
-    result = asyncio.run(segmenter.segment(img, text_query="cup", mode="grasp"))
+    result = segmenter.segment(img, text_query="cup", mode="grasp")
     assert isinstance(result, GroundedSAMResult)
     assert len(result.masks) == 1
 
@@ -61,7 +59,7 @@ def test_segmenter_map_mode_returns_all_masks():
         sam_model_path="mock",
         device="cpu",
     )
-    result = asyncio.run(segmenter.segment(img, text_query="cup . bottle", mode="map"))
+    result = segmenter.segment(img, text_query="cup . bottle", mode="map")
     assert isinstance(result, GroundedSAMResult)
     assert len(result.masks) == 1  # _MockDINO always returns exactly one detection
 
