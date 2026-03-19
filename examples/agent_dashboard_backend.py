@@ -1,9 +1,11 @@
 import asyncio
 import base64
+import json
 import threading
 from datetime import datetime
 
 import cv2
+import httpx
 import ollama
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,6 +57,107 @@ async def startup_event() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 天气工具
+# ---------------------------------------------------------------------------
+
+_WEATHER_DESC_ZH = {
+    "Sunny": "晴", "Clear": "晴", "Partly Cloudy": "多云", "Cloudy": "阴",
+    "Overcast": "阴天", "Mist": "薄雾", "Fog": "雾", "Light drizzle": "小毛毛雨",
+    "Drizzle": "毛毛雨", "Light rain": "小雨", "Moderate rain": "中雨",
+    "Heavy rain": "大雨", "Thunderstorm": "雷暴", "Snow": "雪",
+    "Light snow": "小雪", "Patchy rain nearby": "局部阵雨",
+}
+
+
+async def _get_weather(city: str) -> str:
+    """调用 wttr.in 获取指定城市实时天气。"""
+    url = f"https://wttr.in/{city}?format=j1"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+        c = data["data"]["current_condition"][0]
+        desc_en = c["weatherDesc"][0]["value"].strip()
+        desc = _WEATHER_DESC_ZH.get(desc_en, desc_en)
+        today = data["data"]["weather"][0]
+        result = (
+            f"{city}当前天气：{desc}，"
+            f"气温 {c['temp_C']}°C（体感 {c['FeelsLikeC']}°C），"
+            f"湿度 {c['humidity']}%，风速 {c['windspeedKmph']} km/h。"
+            f"今日最高 {today['maxtempC']}°C / 最低 {today['mintempC']}°C。"
+        )
+        return result
+    except Exception as e:
+        return f"获取 {city} 天气失败：{e}"
+
+
+_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "获取指定城市的实时天气信息，包括气温、湿度、天气状况等",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "城市名称，支持中文或英文，如 '武汉'、'Beijing'",
+                    }
+                },
+                "required": ["city"],
+            },
+        },
+    }
+]
+
+_TOOL_HANDLERS = {
+    "get_weather": lambda args: _get_weather(args["city"]),
+}
+
+
+async def _chat_with_tools(user_message: str) -> str:
+    """带 Tool Call 的对话：模型可主动调用 get_weather 获取实时数据。"""
+    messages = [{"role": "user", "content": user_message}]
+
+    # 第一轮：让模型决定是否调用工具
+    response = await asyncio.to_thread(
+        ollama.chat,
+        model="qwen3.5:latest",
+        messages=messages,
+        tools=_TOOLS,
+    )
+    msg = response["message"]
+
+    # 若模型没有调用工具，直接返回
+    if not msg.get("tool_calls"):
+        return msg["content"]
+
+    # 执行所有工具调用
+    messages.append(msg)
+    for tc in msg["tool_calls"]:
+        fn_name = tc["function"]["name"]
+        fn_args = tc["function"]["arguments"]
+        if isinstance(fn_args, str):
+            fn_args = json.loads(fn_args)
+        handler = _TOOL_HANDLERS.get(fn_name)
+        tool_result = await handler(fn_args) if handler else f"未知工具: {fn_name}"
+        messages.append({
+            "role": "tool",
+            "content": tool_result,
+        })
+
+    # 第二轮：把工具结果交给模型生成最终回答
+    final = await asyncio.to_thread(
+        ollama.chat,
+        model="qwen3.5:latest",
+        messages=messages,
+    )
+    return final["message"]["content"]
+
+
+# ---------------------------------------------------------------------------
 # 辅助：获取当前帧 base64
 # ---------------------------------------------------------------------------
 
@@ -92,12 +195,7 @@ async def healthz():
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        response = await asyncio.to_thread(
-            ollama.chat,
-            model="qwen3.5:latest",
-            messages=[{"role": "user", "content": request.message}],
-        )
-        response_text = response["message"]["content"]
+        response_text = await _chat_with_tools(request.message)
     except Exception as e:
         response_text = f"模型调用失败: {e}"
     return ChatResponse(response=response_text, timestamp=datetime.now())
