@@ -539,6 +539,68 @@ docs/
 
 ---
 
+## Web 前端仪表盘
+
+Agent Dashboard 提供实时摄像头预览、场景描述和目标检测功能，基于 React + FastAPI 构建，使用本地 Ollama `qwen2.5vl` 视觉模型进行推理。
+
+### 前置条件
+
+- USB 摄像头已连接（默认 `/dev/video0`）
+- Ollama 已安装并拉取视觉模型：
+  ```bash
+  ollama pull qwen2.5vl
+  ```
+- Python 依赖：
+  ```bash
+  pip install fastapi uvicorn opencv-python ollama
+  ```
+- Node.js 依赖（首次运行）：
+  ```bash
+  cd web-dashboard && npm install
+  ```
+
+### 启动方式
+
+**终端 1 — 后端**（接入 USB 摄像头 + qwen2.5vl 推理）：
+
+```bash
+cd /path/to/EmbodiedAgentsSys
+python examples/agent_dashboard_backend.py
+# 后端运行在 http://localhost:8000
+```
+
+**终端 2 — 前端**（React 开发服务器）：
+
+```bash
+cd web-dashboard
+npx vite
+# 前端运行在 http://localhost:5173
+```
+
+浏览器打开 `http://localhost:5173`
+
+### 功能页面
+
+| 侧边栏 | 功能 |
+|--------|------|
+| **相机** | 实时画面预览（~10 fps），开始/停止按钮 |
+| **场景分析** | 实时预览 + 点击「场景分析」调用 qwen2.5vl，返回场景文字描述和物体列表 |
+| **检测** | 以表格展示当前画面检测到的物体和置信度 |
+| **对话** | 与后端 Agent 进行文本交互 |
+
+### API 接口
+
+后端提供以下 REST 接口（端口 8000）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/camera/frame` | 获取当前帧（base64 JPEG） |
+| POST | `/api/scene/describe` | 触发 qwen2.5vl 场景理解，返回描述和物体列表 |
+| GET | `/api/detection/result` | 获取最新目标检测结果 |
+| GET | `/healthz` | 健康检查 |
+
+---
+
 ## 相关文档
 
 - [VLA 适配器 API](docs/api/vla_adapter.md)

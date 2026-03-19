@@ -7,6 +7,7 @@ type SidebarItem = {
 const items: SidebarItem[] = [
   { id: 'chat', icon: '📝', label: '对话' },
   { id: 'camera', icon: '📷', label: '相机' },
+  { id: 'scene', icon: '🔍', label: '场景分析' },
   { id: 'detection', icon: '🎯', label: '检测' },
   { id: 'settings', icon: '⚙️', label: '设置' },
 ]

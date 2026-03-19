@@ -3,7 +3,7 @@ import { useSettingsStore } from '../store/useSettingsStore'
 import { useStatusStore } from '../store/useStatusStore'
 
 export const CameraPanel = () => {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const videoRef = useRef<HTMLImageElement>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const { refreshRate } = useSettingsStore()
   const { setFps } = useStatusStore()
@@ -16,7 +16,7 @@ export const CameraPanel = () => {
         const response = await fetch('/api/camera/frame')
         const data = await response.json()
         if (data.frame && videoRef.current) {
-          videoRef.current.src = `data:image/jpeg;base64,${data.frame}`
+          (videoRef.current as HTMLImageElement).src = `data:image/jpeg;base64,${data.frame}`
         }
         if (data.fps) {
           setFps(data.fps)
@@ -38,16 +38,11 @@ export const CameraPanel = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 bg-black rounded-lg overflow-hidden flex items-center justify-center">
-        <video
-          ref={videoRef}
-          className="max-h-full max-w-full"
-          autoPlay
-          playsInline
-        />
-        {!isStreaming && (
-          <p className="text-gray-400">点击开始获取相机画面</p>
-        )}
+      <div className="flex-1 bg-black rounded-lg overflow-hidden flex items-center justify-center min-h-64">
+        {isStreaming
+          ? <img ref={videoRef as React.RefObject<HTMLImageElement>} className="max-h-full max-w-full" alt="camera" />
+          : <p className="text-gray-400">点击开始获取相机画面</p>
+        }
       </div>
       <div className="mt-4 flex gap-4">
         <button
