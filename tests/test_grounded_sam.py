@@ -1,5 +1,8 @@
+import asyncio
+
 import numpy as np
-from agents.components.grounded_sam import GroundedSAMResult
+
+from agents.components.grounded_sam import GroundedSAMResult, GroundedSAMSegmenter
 
 
 def test_grounded_sam_result_fields():
@@ -35,10 +38,6 @@ def test_grounded_sam_result_best_returns_none_when_empty():
         masks=[], bboxes=[], scores=[], labels=[], image_size=(480, 640)
     )
     assert result.best() is None
-
-
-import asyncio
-from agents.components.grounded_sam import GroundedSAMSegmenter
 
 
 def test_segmenter_grasp_mode_returns_single_mask():
