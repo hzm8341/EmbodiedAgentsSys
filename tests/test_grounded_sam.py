@@ -64,4 +64,4 @@ def test_segmenter_map_mode_returns_all_masks():
     )
     result = asyncio.run(segmenter.segment(img, text_query="cup . bottle", mode="map"))
     assert isinstance(result, GroundedSAMResult)
-    assert len(result.masks) >= 0  # mock may return 0 or more
+    assert len(result.masks) == 1  # _MockDINO always returns exactly one detection

@@ -109,7 +109,7 @@ class GroundedSAMSegmenter:
 
     def _run_dino(
         self, image: np.ndarray, text_query: str
-    ) -> tuple:
+    ) -> Tuple[List[Tuple[float, float, float, float]], List[float], List[str]]:
         """Run GroundingDINO; returns (bboxes, scores, labels)."""
         return self._dino(image, text_query, self.box_threshold, self.text_threshold)
 
@@ -124,7 +124,7 @@ class GroundedSAMSegmenter:
         bboxes: List[Tuple[float, float, float, float]],
         scores: List[float],
         labels: List[str],
-    ) -> tuple:
+    ) -> Tuple[List[Tuple[float, float, float, float]], List[float], List[str]]:
         """Remove overlapping boxes with IoU > nms_threshold (keep highest score)."""
         if not bboxes:
             return bboxes, scores, labels
@@ -133,12 +133,13 @@ class GroundedSAMSegmenter:
         keep: List[int] = []
         suppressed: set = set()
 
-        for i in order:
+        for pos_i, i in enumerate(order):
             if i in suppressed:
                 continue
             keep.append(i)
-            for j in order:
-                if j <= i or j in suppressed:
+            for pos_j in range(pos_i + 1, len(order)):
+                j = order[pos_j]
+                if j in suppressed:
                     continue
                 if _compute_iou(bboxes[i], bboxes[j]) > self.nms_threshold:
                     suppressed.add(j)
