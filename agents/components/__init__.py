@@ -43,6 +43,7 @@ from .data_structures import (
     GraspPoint
 )
 from .component_base import Component
+from .grounded_sam import GroundedSAMSegmenter, GroundedSAMResult
 from .imagestovideo import VideoMessageMaker
 from .llm import LLM
 from .map_encoding import MapEncoding
@@ -71,4 +72,6 @@ __all__ = [
     "Vision",
     "VideoMessageMaker",
     "SemanticRouter",
+    "GroundedSAMSegmenter",
+    "GroundedSAMResult",
 ]

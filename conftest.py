@@ -155,6 +155,14 @@ if not _is_ros_available():
     if os.path.exists(config_path):
         _load_module_directly("agents.config_vla_plus", config_path, "agents")
 
+    # Re-export grounded_sam symbols at package level (mirrors __init__.py)
+    _grounded_sam_mod = sys.modules.get("agents.components.grounded_sam")
+    if _grounded_sam_mod is not None:
+        _components_pkg = sys.modules.get("agents.components")
+        if _components_pkg is not None:
+            setattr(_components_pkg, "GroundedSAMSegmenter", _grounded_sam_mod.GroundedSAMSegmenter)
+            setattr(_components_pkg, "GroundedSAMResult", _grounded_sam_mod.GroundedSAMResult)
+
     # Stub agents.components.voice_command
     vc = _stub("agents.components.voice_command")
     vc.VoiceCommand = object
