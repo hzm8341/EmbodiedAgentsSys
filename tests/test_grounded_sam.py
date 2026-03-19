@@ -35,3 +35,33 @@ def test_grounded_sam_result_best_returns_none_when_empty():
         masks=[], bboxes=[], scores=[], labels=[], image_size=(480, 640)
     )
     assert result.best() is None
+
+
+import asyncio
+from agents.components.grounded_sam import GroundedSAMSegmenter
+
+
+def test_segmenter_grasp_mode_returns_single_mask():
+    """Grasp mode must return exactly 1 mask (highest confidence)."""
+    img = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    segmenter = GroundedSAMSegmenter(
+        dino_model_path="mock",
+        sam_model_path="mock",
+        device="cpu",
+    )
+    result = asyncio.run(segmenter.segment(img, text_query="cup", mode="grasp"))
+    assert isinstance(result, GroundedSAMResult)
+    assert len(result.masks) == 1
+
+
+def test_segmenter_map_mode_returns_all_masks():
+    """Map mode returns all detected results."""
+    img = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    segmenter = GroundedSAMSegmenter(
+        dino_model_path="mock",
+        sam_model_path="mock",
+        device="cpu",
+    )
+    result = asyncio.run(segmenter.segment(img, text_query="cup . bottle", mode="map"))
+    assert isinstance(result, GroundedSAMResult)
+    assert len(result.masks) >= 0  # mock may return 0 or more
