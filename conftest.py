@@ -138,6 +138,7 @@ if not _is_ros_available():
         ("agents.components.qwen3l_processor", "qwen3l_processor.py"),
         ("agents.components.vla_plus", "vla_plus.py"),
         ("agents.components.grounded_sam", "grounded_sam.py"),
+        ("agents.components.semantic_map", "semantic_map.py"),
     ]:
         # Try worktree first, then fall back to main repo
         path = f"{WORKTREE}/agents/components/{filename}"
