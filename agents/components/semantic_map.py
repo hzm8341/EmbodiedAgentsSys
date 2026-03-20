@@ -63,7 +63,7 @@ class SemanticMap:
         """Record an object's semantic location."""
         self._data["objects"][name] = {
             "location": location,
-            "pos_3d": pos_3d or [],
+            "pos_3d": pos_3d if pos_3d is not None else [],
         }
 
     def get_object(self, name: str) -> Optional[Dict[str, Any]]:
