@@ -67,3 +67,38 @@ def test_abstract_methods_enforced():
     """ArmAdapter cannot be instantiated without all abstract methods."""
     with pytest.raises(TypeError):
         ArmAdapter()  # type: ignore
+
+
+# --- AGX Arm wrapper ---
+from agents.hardware.agx_arm_adapter import AGXArmAdapter
+
+def test_agx_adapter_capabilities():
+    adapter = AGXArmAdapter(config={})
+    cap = adapter.get_capabilities()
+    assert cap.robot_type == "arm"
+    assert "manipulation.grasp" in cap.supported_skills
+
+
+@pytest.mark.anyio
+async def test_agx_adapter_is_ready_no_hardware():
+    """Without real hardware, is_ready returns False (not raises)."""
+    adapter = AGXArmAdapter(config={"mock": True})
+    result = await adapter.is_ready()
+    assert isinstance(result, bool)
+
+
+# --- LeRobot wrapper ---
+from agents.hardware.lerobot_arm_adapter import LeRobotArmAdapter
+
+def test_lerobot_adapter_capabilities():
+    adapter = LeRobotArmAdapter(config={})
+    cap = adapter.get_capabilities()
+    assert cap.robot_type == "arm"
+    assert "manipulation.reach" in cap.supported_skills
+
+
+@pytest.mark.anyio
+async def test_lerobot_adapter_is_ready_no_hardware():
+    adapter = LeRobotArmAdapter(config={"mock": True})
+    result = await adapter.is_ready()
+    assert isinstance(result, bool)
