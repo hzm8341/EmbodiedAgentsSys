@@ -99,4 +99,8 @@ __all__ = [
     "TaskAction",
     "TaskPlan",
     "SemanticMap",
+    "SceneSpec",
+    "PlanGenerator",
+    "ExecutionPlan",
+    "VoiceTemplateAgent",
 ]
