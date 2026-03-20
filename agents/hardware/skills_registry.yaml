@@ -1,0 +1,29 @@
+# Phase 1 static skill registry — extend in Phase 2 with performance metrics
+skills:
+  - id: manipulation.grasp
+    robot_types: [arm, mobile_arm]
+    description: "Pick up an object using the end-effector"
+  - id: manipulation.place
+    robot_types: [arm, mobile_arm]
+    description: "Place a held object at a target location"
+  - id: manipulation.reach
+    robot_types: [arm, mobile_arm]
+    description: "Move end-effector to a target pose without grasping"
+  - id: manipulation.inspect
+    robot_types: [arm, mobile, mobile_arm]
+    description: "Visually inspect a target object or location"
+  - id: navigation.goto
+    robot_types: [mobile, mobile_arm]
+    description: "Navigate mobile base to a waypoint"
+  - id: navigation.dock
+    robot_types: [mobile, mobile_arm]
+    description: "Precisely dock at a station"
+  - id: vision.detect
+    robot_types: [arm, mobile, mobile_arm]
+    description: "Detect and localize objects in the scene"
+  - id: vision.segment
+    robot_types: [arm, mobile, mobile_arm]
+    description: "Segment objects using vision models"
+  - id: force.push
+    robot_types: [arm, mobile_arm]
+    description: "Apply controlled force for assembly or insertion"
