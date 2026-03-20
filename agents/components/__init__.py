@@ -42,20 +42,39 @@ from .data_structures import (
     GraspCommand,
     GraspPoint
 )
-from .component_base import Component
 from .grounded_sam import GroundedSAMSegmenter, GroundedSAMResult
-from .imagestovideo import VideoMessageMaker
-from .llm import LLM
-from .map_encoding import MapEncoding
-from .mllm import MLLM, VLM
-from .model_component import ModelComponent
-from .semantic_router import SemanticRouter
-from .speechtotext import SpeechToText
-from .texttospeech import TextToSpeech
-from .vision import Vision
-from .vla import VLA
 from .task_planner import TaskPlanner, TaskAction, TaskPlan
 from .semantic_map import SemanticMap
+from .scene_spec import SceneSpec
+from .plan_generator import PlanGenerator, ExecutionPlan
+from .voice_template_agent import VoiceTemplateAgent
+
+# ROS-dependent components — only available when rclpy / ros_sugar is installed
+try:
+    from .component_base import Component
+    from .imagestovideo import VideoMessageMaker
+    from .llm import LLM
+    from .map_encoding import MapEncoding
+    from .mllm import MLLM, VLM
+    from .model_component import ModelComponent
+    from .semantic_router import SemanticRouter
+    from .speechtotext import SpeechToText
+    from .texttospeech import TextToSpeech
+    from .vision import Vision
+    from .vla import VLA
+except (ImportError, ModuleNotFoundError):
+    Component = None
+    VideoMessageMaker = None
+    LLM = None
+    MapEncoding = None
+    MLLM = None
+    VLM = None
+    ModelComponent = None
+    SemanticRouter = None
+    SpeechToText = None
+    TextToSpeech = None
+    Vision = None
+    VLA = None
 
 __all__ = [
     "Component",
