@@ -44,6 +44,13 @@
   - 基于规则的任务规划
   - LLM 驱动的智能任务分解
 
+- **核心执行闭环 (Phase 1)**
+  - 硬件抽象层：统一机械臂接口 + 多厂商适配器
+  - 技能注册表 + 能力缺口检测（YAML 驱动）
+  - 场景规格说明 + 语音交互填充
+  - 双格式执行计划（YAML 机器可读 + Markdown 人类可读）
+  - 失败数据自动记录 + 训练脚本自动生成
+
 ---
 
 ## 功能列表
@@ -88,6 +95,31 @@
 | BatchProcessor | 批处理器 | ✅ |
 | RateLimiter | 速率限制器 | ✅ |
 | ForceController | 力控制器 | ✅ |
+
+### 硬件抽象层 (Phase 1)
+
+| 模块 | 说明 | 状态 |
+|------|------|------|
+| ArmAdapter | 机械臂抽象基类（ABC），定义 `move_to_pose` / `move_joints` / `set_gripper` 等统一接口 | ✅ |
+| AGXArmAdapter | AGX 机械臂适配器（异步，支持 mock 模式） | ✅ |
+| LeRobotArmAdapter | LeRobot 机械臂适配器（复用 LeRobotClient） | ✅ |
+| RobotCapabilityRegistry | YAML 驱动的技能注册表，支持按 `robot_type` 查询能力，返回 `GapType` 枚举 | ✅ |
+| GapDetectionEngine | 对执行计划步骤做 hard-gap 分类标注，输出 `GapReport` | ✅ |
+
+### 规划层扩展 (Phase 1)
+
+| 模块 | 说明 | 状态 |
+|------|------|------|
+| SceneSpec | 结构化场景描述 dataclass，支持 YAML 序列化/反序列化 | ✅ |
+| PlanGenerator | 封装 TaskPlanner，将 flat action 映射为 dot-notation 技能名，输出 YAML + Markdown 双格式执行计划 | ✅ |
+| VoiceTemplateAgent | 引导式语音 Q&A，逐步填充 SceneSpec 字段 | ✅ |
+
+### 数据与训练 (Phase 1)
+
+| 模块 | 说明 | 状态 |
+|------|------|------|
+| FailureDataRecorder | 失败时自动保存 `metadata.json` + `scene_spec.yaml` + `plan.yaml` | ✅ |
+| TrainingScriptGenerator | 根据能力缺口生成数据集需求报告和 bash 训练脚本 | ✅ |
 
 ---
 
@@ -449,7 +481,117 @@ export_result = await generator.export_skill(result["skill_id"])
 # 生成可执行的 Python 文件
 ```
 
-### 10. 分布式事件总线 (多机器人协作)
+### 10. Phase 1 核心执行闭环
+
+#### 场景描述 + 语音交互填充
+
+```python
+import asyncio
+from agents.components.scene_spec import SceneSpec
+from agents.components.voice_template_agent import VoiceTemplateAgent
+
+# 方式一：直接构建 SceneSpec
+scene = SceneSpec(
+    task_description="将红色零件从A区搬运到B区",
+    robot_type="arm",
+    objects=["red_part"],
+    target_positions={"red_part": [0.5, 0.2, 0.1]},
+)
+
+# 方式二：引导式语音交互填充
+agent = VoiceTemplateAgent()
+scene = asyncio.run(agent.interactive_fill())
+```
+
+#### 生成执行计划（YAML + Markdown 双格式）
+
+```python
+from agents.components.plan_generator import PlanGenerator
+
+generator = PlanGenerator(backend="mock")  # backend="ollama" 使用 LLM
+plan = asyncio.run(generator.generate(scene))
+
+print(plan.yaml_content)    # YAML 执行计划（机器可读）
+print(plan.markdown_report) # Markdown 报告（人类可读）
+print(plan.steps)           # 步骤列表，每步含 dot-notation 技能名
+# e.g. [{'action': 'manipulation.grasp', 'object': 'red_part', ...}]
+```
+
+#### 技能注册表 + 能力缺口检测
+
+```python
+from agents.hardware.capability_registry import RobotCapabilityRegistry, GapType
+from agents.hardware.gap_detector import GapDetectionEngine
+
+registry = RobotCapabilityRegistry()
+
+# 查询单个技能
+result = registry.query("manipulation.grasp", robot_type="arm")
+print(result.gap_type)  # GapType.NONE — 支持
+
+result = registry.query("navigation.goto", robot_type="arm")
+print(result.gap_type)  # GapType.HARD — 不支持
+
+# 对计划步骤批量检测缺口
+engine = GapDetectionEngine(registry)
+report = engine.detect(plan.steps, robot_type="arm")
+print(report.has_gaps)        # True/False
+print(report.gap_steps)       # 有缺口的步骤列表
+annotated = engine.annotate_steps(plan.steps, robot_type="arm")
+# 每步新增 status: "pending" 或 "gap"
+```
+
+#### 失败数据记录 + 训练脚本生成
+
+```python
+from agents.data.failure_recorder import FailureDataRecorder
+from agents.training.script_generator import TrainingScriptGenerator
+
+# 执行失败时保存现场数据
+recorder = FailureDataRecorder(base_dir="./failure_data")
+record_path = asyncio.run(recorder.record(
+    scene=scene,
+    plan=plan,
+    error="manipulation.grasp 执行超时",
+))
+# 保存：failure_data/<timestamp>/metadata.json + scene_spec.yaml + plan.yaml
+
+# 根据能力缺口生成训练脚本
+generator = TrainingScriptGenerator()
+config = generator.generate_config(gap_report=report, scene=scene)
+script = generator.generate_script(config)
+print(script)  # bash 训练脚本内容
+req_report = generator.generate_requirements_report(config)
+print(req_report)  # 数据集需求报告（Markdown）
+```
+
+#### 使用机械臂适配器
+
+```python
+from agents.hardware.agx_arm_adapter import AGXArmAdapter
+from agents.hardware.arm_adapter import Pose6D
+
+# 创建适配器（mock=True 用于测试，不需要真实硬件）
+arm = AGXArmAdapter(host="192.168.1.100", mock=True)
+asyncio.run(arm.connect())
+
+# 检查就绪
+ready = asyncio.run(arm.is_ready())
+
+# 移动到目标位姿
+pose = Pose6D(x=0.3, y=0.0, z=0.2, roll=0.0, pitch=0.0, yaw=0.0)
+success = asyncio.run(arm.move_to_pose(pose, speed=0.1))
+
+# 控制夹爪
+asyncio.run(arm.set_gripper(opening=0.8, force=5.0))
+
+# 查询能力
+caps = arm.get_capabilities()
+print(caps.robot_type)   # "arm"
+print(caps.skill_ids)    # ["manipulation.grasp", "manipulation.place", ...]
+```
+
+### 11. 分布式事件总线 (多机器人协作)
 
 ```python
 from agents.events.bus import DistributedEventBus
@@ -499,42 +641,56 @@ skills:
 ```
 agents/
 ├── clients/
-│   ├── vla_adapters/      # VLA 适配器
+│   ├── vla_adapters/          # VLA 适配器
 │   │   ├── base.py
 │   │   ├── lerobot.py
 │   │   ├── act.py
 │   │   └── gr00t.py
-│   └── ollama.py          # Ollama LLM 客户端
-├── components/            # 组件
+│   └── ollama.py              # Ollama LLM 客户端
+├── components/                # 组件
 │   ├── voice_command.py
 │   ├── semantic_parser.py
-│   └── task_planner.py
+│   ├── task_planner.py        # 含 _SKILL_NAMESPACE_MAP
+│   ├── scene_spec.py          # [Phase 1] 场景规格说明 dataclass
+│   ├── plan_generator.py      # [Phase 1] 双格式执行计划生成器
+│   └── voice_template_agent.py# [Phase 1] 引导式语音交互填充
+├── hardware/                  # [Phase 1] 硬件抽象层
+│   ├── arm_adapter.py         # ArmAdapter ABC + Pose6D / RobotState / RobotCapabilities
+│   ├── agx_arm_adapter.py     # AGX 机械臂适配器
+│   ├── lerobot_arm_adapter.py # LeRobot 机械臂适配器
+│   ├── capability_registry.py # RobotCapabilityRegistry + GapType 枚举
+│   ├── gap_detector.py        # GapDetectionEngine
+│   └── skills_registry.yaml   # 技能注册表（9 个技能）
+├── data/                      # [Phase 1] 数据层
+│   └── failure_recorder.py    # 失败数据自动记录
+├── training/                  # [Phase 1] 训练层
+│   └── script_generator.py    # 训练脚本 + 数据集需求报告生成
 ├── skills/
-│   ├── vla_skill.py      # Skill 基类
-│   └── manipulation/      # 操作技能
+│   ├── vla_skill.py           # Skill 基类
+│   └── manipulation/          # 操作技能
 │       ├── grasp.py
 │       ├── place.py
 │       ├── reach.py
 │       ├── move.py
 │       └── inspect.py
-├── events/               # 事件系统
-│   └── bus.py            # EventBus + DistributedEventBus
-└── utils/               # 工具类
+├── events/                    # 事件系统
+│   └── bus.py                 # EventBus + DistributedEventBus
+└── utils/                     # 工具类
     └── performance.py
 
 skills/
-├── force_control/       # 力控模块
+├── force_control/             # 力控模块
 │   └── force_control.py
-├── vision/             # 视觉技能
+├── vision/                    # 视觉技能
 │   └── perception_3d_skill.py
-└── teaching/           # 示教模块
+└── teaching/                  # 示教模块
     └── skill_generator.py
 
-tests/                   # 测试
+tests/                         # 测试（57 个用例）
 docs/
-├── api/                 # API 文档
-├── guides/              # 使用指南
-└── plans/               # 开发计划
+├── api/                       # API 文档
+├── guides/                    # 使用指南
+└── plans/                     # 开发计划
 ```
 
 ---
