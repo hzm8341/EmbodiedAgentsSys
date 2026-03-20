@@ -1,7 +1,6 @@
 """AGX Arm ArmAdapter wrapper — delegates to existing AGX client if available."""
-import asyncio
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from .arm_adapter import ArmAdapter, Pose6D, RobotState, RobotCapabilities
 
@@ -52,6 +51,8 @@ class AGXArmAdapter(ArmAdapter):
         raise NotImplementedError("AGX set_gripper requires Phase 2 hardware bridge")
 
     async def get_state(self) -> RobotState:
+        if not self._mock:
+            raise NotImplementedError("get_state requires Phase 2 hardware bridge")
         return RobotState(
             joint_angles=[0.0] * 6,
             end_effector_pose=Pose6D(0, 0, 0, 0, 0, 0),
