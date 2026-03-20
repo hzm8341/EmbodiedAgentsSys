@@ -54,6 +54,8 @@ from .speechtotext import SpeechToText
 from .texttospeech import TextToSpeech
 from .vision import Vision
 from .vla import VLA
+from .task_planner import TaskPlanner, TaskAction, TaskPlan
+from .semantic_map import SemanticMap
 
 __all__ = [
     "Component",
@@ -74,4 +76,8 @@ __all__ = [
     "SemanticRouter",
     "GroundedSAMSegmenter",
     "GroundedSAMResult",
+    "TaskPlanner",
+    "TaskAction",
+    "TaskPlan",
+    "SemanticMap",
 ]

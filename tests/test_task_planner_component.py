@@ -63,3 +63,43 @@ def test_planner_replan_with_history(planner):
     prompt = planner._build_prompt("拿起花")
     assert "flower" in prompt
     assert "desk" in prompt
+
+
+# ---------- Integration Tests ----------
+
+from agents.components.semantic_map import SemanticMap
+
+
+def test_planner_uses_semantic_map_in_prompt(planner, tmp_path):
+    """规划 prompt 应包含语义地图中的地点信息。"""
+    map_path = tmp_path / "map.yaml"
+    sm = SemanticMap(map_path=str(map_path))
+    sm.add_location("实验台", x=1.5, y=0.0, theta=0.0)
+    sm.add_object("烧杯", location="实验台")
+
+    planner._semantic_map = sm
+    prompt = planner._build_prompt("拿起烧杯")
+    assert "实验台" in prompt
+    assert "烧杯" in prompt
+
+
+@pytest.mark.anyio
+async def test_full_replan_cycle(tmp_path):
+    """完整重规划循环：规划 → 记录失败 → 重规划。"""
+    from agents.components.task_planner import TaskPlanner
+    map_path = tmp_path / "map.yaml"
+    sm = SemanticMap(map_path=str(map_path))
+    sm.add_location("桌子", x=1.0, y=0.0, theta=0.0)
+
+    planner = TaskPlanner(backend="mock", semantic_map=sm)
+    # 第一次规划
+    plan1 = await planner.plan("拿起花")
+    assert plan1.success
+
+    # 模拟失败
+    planner.record_failure(target="花", location="桌子", reason="not found")
+
+    # 重规划，历史应出现在 prompt
+    prompt = planner._build_prompt("拿起花")
+    assert "失败" in prompt
+    assert "花" in prompt
