@@ -1,6 +1,5 @@
 # tests/test_task_planner_component.py
 import pytest
-import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 from agents.components.task_planner import TaskPlanner, TaskAction, TaskPlan
 
@@ -50,9 +49,10 @@ def test_planner_clear_history(planner):
     assert planner.get_failure_history() == []
 
 
-def test_planner_plan_sync_mock(planner):
+@pytest.mark.anyio
+async def test_planner_plan_sync_mock(planner):
     """mock 后端同步规划测试。"""
-    plan = asyncio.run(planner.plan("拿起桌上的杯子"))
+    plan = await planner.plan("拿起桌上的杯子")
     assert isinstance(plan, TaskPlan)
     assert len(plan.actions) >= 1
 

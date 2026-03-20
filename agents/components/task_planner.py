@@ -75,10 +75,16 @@ class TaskPlanner:
 
     def _init_ollama(self) -> None:
         """初始化 Ollama 客户端。"""
+        import logging
         try:
             from ollama import Client
             self._ollama_client = Client(host="http://127.0.0.1:11434")
-        except Exception:
+        except ImportError:
+            self._backend = "mock"
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Ollama client init failed (%s), falling back to mock backend", exc
+            )
             self._backend = "mock"
 
     # ---------- 失败历史 ----------
@@ -154,7 +160,8 @@ class TaskPlanner:
             return TaskPlan(actions=actions, instruction=instruction)
 
         try:
-            response = await asyncio.get_event_loop().run_in_executor(
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
                 None,
                 lambda: self._ollama_client.generate(
                     model=self._model,
