@@ -68,5 +68,6 @@ class VoiceTemplateAgent:
         for field_name, question, is_list in _QUESTIONS:
             await output_fn(f"\n❓ {question}")
             response = await input_fn(question)
-            answers[field_name] = response
+            # For list fields, parse comma-separated input into a list immediately
+            answers[field_name] = _parse_list(response) if is_list else response
         return await self.fill_from_answers(answers)

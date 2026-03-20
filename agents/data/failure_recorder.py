@@ -1,6 +1,7 @@
 """FailureDataRecorder — saves execution failure data for training pipeline."""
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 import uuid
@@ -45,7 +46,6 @@ class FailureDataRecorder:
         record_dir = self._base / record.failure_id
         record_dir.mkdir(parents=True, exist_ok=True)
 
-        # metadata.json
         meta = {
             "failure_id": record.failure_id,
             "timestamp": record.timestamp,
@@ -53,28 +53,28 @@ class FailureDataRecorder:
             "error_type": record.error_type,
             "notes": record.notes,
         }
-        (record_dir / "metadata.json").write_text(
-            json.dumps(meta, ensure_ascii=False, indent=2)
-        )
 
-        # scene_spec.yaml
-        (record_dir / "scene_spec.yaml").write_text(record.scene_spec.to_yaml())
+        def _write_files() -> None:
+            (record_dir / "metadata.json").write_text(
+                json.dumps(meta, ensure_ascii=False, indent=2)
+            )
+            (record_dir / "scene_spec.yaml").write_text(record.scene_spec.to_yaml())
+            (record_dir / "plan.yaml").write_text(record.plan_yaml)
 
-        # plan.yaml
-        (record_dir / "plan.yaml").write_text(record.plan_yaml)
-
+        await asyncio.to_thread(_write_files)
         return str(record_dir)
 
     def list_records(self) -> list[str]:
-        """Return sorted list of all recorded failure directory paths."""
+        """Return list of all recorded failure directory paths sorted by creation time (oldest first)."""
         if not self._base.exists():
             return []
-        return sorted(
-            str(p) for p in self._base.iterdir() if p.is_dir()
-        )
+        dirs = [p for p in self._base.iterdir() if p.is_dir()]
+        return [str(p) for p in sorted(dirs, key=lambda p: p.stat().st_ctime)]
 
     def cleanup_old(self, keep_count: int = 1000) -> int:
         """Remove oldest records when count exceeds keep_count. Returns number deleted."""
+        if keep_count <= 0:
+            return 0
         records = self.list_records()
         to_delete = records[:-keep_count] if len(records) > keep_count else []
         for path in to_delete:
