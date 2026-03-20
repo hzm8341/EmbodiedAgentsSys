@@ -30,6 +30,12 @@ class TaskPlan:
     def __str__(self) -> str:
         return " -> ".join(str(a) for a in self.actions)
 
+    @property
+    def skills(self) -> set:
+        """返回计划中涉及的技能名称集合（pick 映射为 grasp）。"""
+        _map = {"pick": "grasp", "place": "place", "go_to": "navigate", "inspect": "inspect"}
+        return {_map.get(a.action, a.action) for a in self.actions}
+
 
 _SYSTEM_PROMPT = """你是一个机器人任务规划器。将用户指令分解为一系列原子动作。
 
@@ -47,6 +53,14 @@ _SYSTEM_PROMPT = """你是一个机器人任务规划器。将用户指令分解
   {"action": "place", "target": "cup",  "location": "table"}
 ]"""
 
+# Canonical skill namespace mapping — flat action → dot-notation skill ID
+_SKILL_NAMESPACE_MAP: dict = {
+    "pick":    "manipulation.grasp",
+    "place":   "manipulation.place",
+    "go_to":   "navigation.goto",
+    "inspect": "manipulation.inspect",
+}
+
 
 class TaskPlanner:
     """
@@ -63,10 +77,12 @@ class TaskPlanner:
         ollama_model: str = "qwen2.5:3b",
         backend: Literal["ollama", "mock"] = "ollama",
         semantic_map: Optional[SemanticMap] = None,
+        strategy: Optional[str] = None,
     ):
         self._model = ollama_model
         self._backend = backend
         self._semantic_map = semantic_map
+        self._strategy = strategy
         self._failure_history: List[str] = []
         self._ollama_client = None
 
@@ -189,5 +205,20 @@ class TaskPlanner:
             )
 
     def _mock_plan(self, instruction: str) -> List[TaskAction]:
-        """Mock 规划器，用于测试。返回固定的单动作计划。"""
-        return [TaskAction(action="inspect", target="target", location="base")]
+        """Mock 规划器，用于测试。根据指令关键词生成简单计划。"""
+        actions = []
+        if any(kw in instruction for kw in ["抓", "拿", "取", "grasp", "pick"]):
+            actions.append(TaskAction(action="pick", target="target", location="source"))
+        if any(kw in instruction for kw in ["放", "置", "place", "put"]):
+            actions.append(TaskAction(action="place", target="target", location="destination"))
+        if not actions:
+            actions.append(TaskAction(action="inspect", target="target", location="base"))
+        return actions
+
+
+class PlanningStrategy:
+    """任务规划策略枚举，用于指定规划器的行为模式。"""
+
+    RULE_BASED = "rule_based"
+    LLM_BASED = "llm_based"
+    HYBRID = "hybrid"
