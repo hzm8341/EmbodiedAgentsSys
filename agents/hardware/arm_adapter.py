@@ -1,7 +1,6 @@
 """ArmAdapter — 机械臂硬件抽象接口 (Phase 1)."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List
 
 
 @dataclass
@@ -18,7 +17,7 @@ class Pose6D:
 @dataclass
 class RobotState:
     """Snapshot of robot state at a single instant."""
-    joint_angles: List[float]
+    joint_angles: list[float]
     end_effector_pose: Pose6D
     gripper_opening: float   # 0.0 = closed, 1.0 = fully open
     is_moving: bool
@@ -29,7 +28,7 @@ class RobotState:
 class RobotCapabilities:
     """Static capabilities metadata reported by the adapter."""
     robot_type: str                          # "arm" | "mobile" | "mobile_arm"
-    supported_skills: List[str]              # dot-notation skill IDs
+    supported_skills: list[str]              # dot-notation skill IDs
     max_payload_kg: float = 0.0
     reach_m: float = 0.0
 
@@ -42,7 +41,7 @@ class ArmAdapter(ABC):
         """Move end-effector to Pose6D. Returns True on success."""
 
     @abstractmethod
-    async def move_joints(self, angles: List[float], speed: float = 0.1) -> bool:
+    async def move_joints(self, angles: list[float], speed: float = 0.1) -> bool:
         """Command joint angles (radians). Returns True on success."""
 
     @abstractmethod
