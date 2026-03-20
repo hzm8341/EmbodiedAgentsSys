@@ -55,14 +55,15 @@ def test_voice_to_skill_pipeline():
 
 def test_task_planning_integration():
     """验证任务规划集成"""
+    import asyncio
     from agents.components.task_planner import TaskPlanner, PlanningStrategy
     from agents.skills.manipulation import GraspSkill, PlaceSkill
 
-    # 创建规划器
-    planner = TaskPlanner(strategy=PlanningStrategy.RULE_BASED)
+    # 创建规划器（mock backend 避免 Ollama 依赖）
+    planner = TaskPlanner(strategy=PlanningStrategy.RULE_BASED, backend="mock")
 
     # 规划抓取放置任务
-    task = planner.plan("抓取杯子放到桌子上")
+    task = asyncio.run(planner.plan("抓取杯子放到桌子上"))
 
     # 验证技能序列
     assert "grasp" in task.skills
@@ -99,8 +100,9 @@ def test_full_teaching_flow():
     assert command.intent == "task"
 
     # 2. 任务规划
-    planner = TaskPlanner()
-    task = planner.plan(command.raw_text)
+    import asyncio
+    planner = TaskPlanner(backend="mock")
+    task = asyncio.run(planner.plan(command.raw_text))
 
     # 3. 创建技能
     vla_adapter = LeRobotVLAAdapter(config={"action_dim": 7})

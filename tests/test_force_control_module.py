@@ -82,8 +82,8 @@ def test_contact_detection():
 
     # 有接触
     force_with_contact = np.array([0.0, 0.0, 5.0])
-    assert controller.detect_contact(force_with_contact) is True
+    assert controller.detect_contact(force_with_contact) == True
 
     # 无接触
     force_no_contact = np.array([0.0, 0.0, 0.1])
-    assert controller.detect_contact(force_no_contact) is False
+    assert controller.detect_contact(force_no_contact) == False

@@ -4,24 +4,29 @@
 import asyncio
 import sys
 import os
-import importlib.util
 
-# 直接加载task_planner模块，绕过ROS依赖检查
-spec = importlib.util.spec_from_file_location(
-    "task_planner",
-    "/media/hzm/data_disk/EmbodiedAgentsSys/agents/components/task_planner.py"
-)
-task_planner_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(task_planner_module)
+# AGENTS_DOCS_BUILD is set in conftest.py; set here as fallback
+os.environ.setdefault("AGENTS_DOCS_BUILD", "1")
 
-# 导入需要的类
-TaskPlanner = task_planner_module.TaskPlanner
-TaskExecutor = task_planner_module.TaskExecutor
-ExecutionContext = task_planner_module.ExecutionContext
-TaskType = task_planner_module.TaskType
-TaskStatus = task_planner_module.TaskStatus
-TaskStep = task_planner_module.TaskStep
-ExecutionResult = task_planner_module.ExecutionResult
+from agents.components.task_planner import TaskPlanner
+
+# 以下类在当前版本的 task_planner 中尚未实现，使用占位符保持向后兼容
+try:
+    from agents.components.task_planner import (
+        TaskExecutor,
+        ExecutionContext,
+        TaskType,
+        TaskStatus,
+        TaskStep,
+        ExecutionResult,
+    )
+except ImportError:
+    TaskExecutor = None
+    ExecutionContext = None
+    TaskType = None
+    TaskStatus = None
+    TaskStep = None
+    ExecutionResult = None
 
 
 # 模拟LLM客户端

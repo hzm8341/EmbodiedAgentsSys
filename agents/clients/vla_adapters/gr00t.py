@@ -25,8 +25,8 @@ class GR00TVLAAdapter(VLAAdapterBase):
         super().__init__(config)
         self.model_path = config.get("model_path")
         self.inference_steps = config.get("inference_steps", 10)  # Diffusion 步数
-        self.action_dim = config.get("action_dim", 7)  # 动作维度
-        self.action_horizon = config.get("action_horizon", 8)  # 动作视野
+        self._action_dim = config.get("action_dim", 7)  # 动作维度
+        self._action_horizon = config.get("action_horizon", 8)  # 动作视野
         self._model = None
 
     def reset(self) -> None:
@@ -111,4 +111,4 @@ class GR00TVLAAdapter(VLAAdapterBase):
     @property
     def action_horizon(self) -> int:
         """动作视野"""
-        return self.action_horizon
+        return self._action_horizon

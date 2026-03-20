@@ -49,15 +49,25 @@ Some clients might need additional dependacies, which are provided in the follow
     `chroma run --path /db_path`
 """
 
-from .generic import GenericHTTPClient
-from .ollama import OllamaClient
-from .roboml import (
-    RoboMLHTTPClient,
-    RoboMLRESPClient,
-    RoboMLWSClient,
-)
-from .lerobot import LeRobotClient
-from .chroma import ChromaClient
+# These clients depend on rclpy / ROS packages — guard against missing deps
+try:
+    from .generic import GenericHTTPClient
+    from .ollama import OllamaClient
+    from .roboml import (
+        RoboMLHTTPClient,
+        RoboMLRESPClient,
+        RoboMLWSClient,
+    )
+    from .lerobot import LeRobotClient
+    from .chroma import ChromaClient
+except (ImportError, ModuleNotFoundError):
+    GenericHTTPClient = None
+    OllamaClient = None
+    RoboMLHTTPClient = None
+    RoboMLRESPClient = None
+    RoboMLWSClient = None
+    LeRobotClient = None
+    ChromaClient = None
 
 
 __all__ = [

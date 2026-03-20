@@ -35,6 +35,14 @@ class PlaceSkill(VLASkill):
         self.target_position = target_position
         self._position_threshold = position_threshold or self.DEFAULT_POSITION_THRESHOLD
 
+    def build_skill_token(self) -> str:
+        """构建技能令牌"""
+        return f"place(position={self.target_position})"
+
+    def check_preconditions(self, observation: Dict) -> bool:
+        """检查前置条件：物体已被抓取"""
+        return bool(observation.get("object_held", False))
+
     def check_termination(self, observation: Dict) -> bool:
         """检查是否满足终止条件
 

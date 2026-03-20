@@ -32,6 +32,14 @@ class GraspSkill(VLASkill):
         self.object_name = object_name
         self._contact_threshold = contact_threshold or self.DEFAULT_CONTACT_THRESHOLD
 
+    def build_skill_token(self) -> str:
+        """构建技能令牌"""
+        return f"grasp(object={self.object_name})"
+
+    def check_preconditions(self, observation: Dict) -> bool:
+        """检查前置条件：目标物体已被检测到"""
+        return bool(observation.get("object_detected", False))
+
     def check_termination(self, observation: Dict) -> bool:
         """检查是否满足终止条件
 

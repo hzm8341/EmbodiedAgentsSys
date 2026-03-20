@@ -3,17 +3,45 @@ import time
 import subprocess
 import shutil
 
-import cv2
 import pytest
-from agents.models import Idefics2, OllamaModel
-from agents.vectordbs import ChromaDB
-from agents.clients.roboml import (
-    HTTPModelClient,
-    HTTPDBClient,
-    RESPDBClient,
-    RESPModelClient,
+import shutil as _shutil
+
+# Skip all tests in this file when required services are not installed or
+# when the ROS/rclpy dependency is missing (roboml clients depend on agents.models
+# which in turn requires rclpy).
+def _can_import_roboml():
+    try:
+        import agents.clients.roboml  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+pytestmark = pytest.mark.skipif(
+    _shutil.which("roboml") is None or not _can_import_roboml(),
+    reason="roboml service not installed or deps missing; skipping integration tests",
 )
-from agents.clients.ollama import OllamaClient
+
+try:
+    import cv2
+    from agents.models import Idefics2, OllamaModel
+    from agents.vectordbs import ChromaDB
+    from agents.clients.roboml import (
+        HTTPModelClient,
+        HTTPDBClient,
+        RESPDBClient,
+        RESPModelClient,
+    )
+    from agents.clients.ollama import OllamaClient
+except Exception:
+    cv2 = None
+    Idefics2 = None
+    OllamaModel = None
+    ChromaDB = None
+    HTTPModelClient = None
+    HTTPDBClient = None
+    RESPDBClient = None
+    RESPModelClient = None
+    OllamaClient = None
 
 HOST = "http://localhost"
 RAY_PORT = 8000

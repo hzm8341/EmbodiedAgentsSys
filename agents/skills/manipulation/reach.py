@@ -34,6 +34,14 @@ class ReachSkill(VLASkill):
         self.target_position = target_position
         self.position_threshold = position_threshold or self.DEFAULT_POSITION_THRESHOLD
 
+    def build_skill_token(self) -> str:
+        """构建技能令牌"""
+        return f"reach(position={self.target_position})"
+
+    def check_preconditions(self, observation: Dict) -> bool:
+        """检查前置条件：无碰撞检测"""
+        return not bool(observation.get("collision_detected", False))
+
     def check_termination(self, observation: Dict) -> bool:
         """检查是否满足终止条件
 
@@ -45,12 +53,12 @@ class ReachSkill(VLASkill):
             current_pos = np.array(observation["end_effector_pos"][:3])
             target = np.array(self.target_position[:3])
             error = np.linalg.norm(current_pos - target)
-            if error < self.position_threshold:
+            if error <= self.position_threshold:
                 return True
 
         if "distance_to_target" in observation:
             distance = observation["distance_to_target"]
-            if distance < self.position_threshold:
+            if distance <= self.position_threshold:
                 return True
 
         if observation.get("position_reached", False):

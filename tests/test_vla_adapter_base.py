@@ -13,8 +13,8 @@ def test_vla_adapter_is_abc():
 def test_vla_adapter_base_methods():
     """验证基类定义了必要方法"""
     from agents.clients.vla_adapters.base import VLAAdapterBase
-    adapter = VLAAdapterBase(config={})
-    assert hasattr(adapter, "reset")
-    assert hasattr(adapter, "act")
-    assert hasattr(adapter, "execute")
-    assert hasattr(adapter, "action_dim")
+    # Abstract class cannot be instantiated; check the class interface directly
+    assert hasattr(VLAAdapterBase, "reset")
+    assert hasattr(VLAAdapterBase, "act")
+    assert hasattr(VLAAdapterBase, "execute")
+    assert hasattr(VLAAdapterBase, "action_dim")

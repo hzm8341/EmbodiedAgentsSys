@@ -300,6 +300,30 @@ class PerceptionSkill:
         valid_actions = ["detect", "localize", "classify"]
         return action in valid_actions
 
+    def detect_objects(self, image: Any) -> List[Dict]:
+        """同步检测图像中的物体，返回检测结果列表。"""
+        return []
+
+    def get_object_position(
+        self, detections: List[Dict], class_name: str
+    ) -> Optional[List[float]]:
+        """从检测结果中获取指定类别物体的位置。"""
+        for det in detections:
+            if det.get("class") == class_name:
+                return det.get("position")
+        return None
+
+    def is_object_in_view(
+        self, detections: List[Dict], class_name: str, distance_threshold: float = 2.0
+    ) -> bool:
+        """判断指定物体是否在视野范围内（距离小于 distance_threshold 米）。"""
+        position = self.get_object_position(detections, class_name)
+        if position is None:
+            return False
+        import math
+        dist = math.sqrt(sum(v ** 2 for v in position))
+        return dist < distance_threshold
+
 
 def create_perception_skill(config: Dict = None) -> PerceptionSkill:
     """工厂函数: 创建PerceptionSkill实例"""

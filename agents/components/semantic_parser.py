@@ -113,17 +113,17 @@ class SemanticParser:
 
     def _parse_intent(self, text: str) -> str:
         """解析意图类型"""
-        # 运动指令：包含方向关键词
-        if any(kw in text for kw in list(self.DIRECTION_MAP.keys())):
-            return "motion"
+        # 放置指令优先于运动指令（"放到上面" 含方向词但属于放置）
+        if any(kw in text for kw in self.PLACE_KEYWORDS):
+            return "place"
 
         # 抓取指令
         if any(kw in text for kw in self.GRASP_KEYWORDS):
             return "grasp"
 
-        # 放置指令
-        if any(kw in text for kw in self.PLACE_KEYWORDS):
-            return "place"
+        # 运动指令：包含方向关键词
+        if any(kw in text for kw in list(self.DIRECTION_MAP.keys())):
+            return "motion"
 
         return "unknown"
 

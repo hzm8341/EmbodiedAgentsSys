@@ -24,10 +24,10 @@ class ACTVLAAdapter(VLAAdapterBase):
         """
         super().__init__(config)
         self.model_path = config.get("model_path")
-        self.chunk_size = config.get("chunk_size", 100)  # 动作分块大小
+        self._chunk_size = config.get("chunk_size", 100)  # 动作分块大小
         self.horizon = config.get("horizon", 1)  # 预测视野
         self.state_dim = config.get("state_dim", 14)  # 状态维度
-        self.action_dim = config.get("action_dim", 7)  # 动作维度
+        self._action_dim = config.get("action_dim", 7)  # 动作维度
         self._model = None
 
     def reset(self) -> None:

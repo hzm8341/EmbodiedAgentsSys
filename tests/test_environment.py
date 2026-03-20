@@ -3,6 +3,10 @@
 import pytest
 
 
+@pytest.mark.skipif(
+    not __import__("shutil").which("ros2"),
+    reason="sugarcoat requires ROS2/rclpy which is not installed",
+)
 def test_sugarcoat_import():
     """验证Sugarcoat依赖可用"""
     from sugarcoat import Node
