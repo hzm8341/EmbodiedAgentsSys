@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
-
 import yaml
 
 
@@ -21,7 +19,7 @@ class CapabilityResult:
     robot_type: str
     gap_type: GapType
     reason: str = ""
-    suggested_fallback: Optional[str] = None
+    suggested_fallback: str | None = None
 
 
 class RobotCapabilityRegistry:
