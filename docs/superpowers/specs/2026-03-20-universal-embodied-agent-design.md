@@ -1,6 +1,6 @@
 # 通用具身智能 Agent 系统设计规格
 
-**文档版本**: v1.0
+**文档版本**: v1.1
 **创建日期**: 2026-03-20
 **项目**: EmbodiedAgentsSys
 **目标场景**: 仓储物流（移动机器人 + 工业机械臂联合作业）
@@ -93,10 +93,14 @@ constraints:
 第一阶段（概要方案确认）
   → 展示任务分解 + 风险评估 + 能力缺口列表
   → 工程师选择：[确认] / [修改场景] / [放弃]
+  → 超时（默认 5 分钟无响应）：自动保存方案草稿，会话挂起
+  → 无可行方案（全为硬缺口）：输出缺口报告，直接跳转训练触发器，不进入第二阶段
 
 第二阶段（详细执行方案确认）
-  → 展示完整 YAML 执行方案 + 各步骤参数
+  → 展示完整 YAML 执行方案 + 各步骤参数（缺口步骤标注 status: gap）
   → 工程师选择：[确认执行] / [调整参数] / [模拟运行]
+  → 超时（默认 5 分钟）：自动保存，会话挂起
+  → LLM 输出格式错误（非法 YAML）：记录错误，退回第一阶段并提示重新生成
 ```
 
 ---
@@ -114,10 +118,14 @@ constraints:
 - 能力缺口高亮标注
 
 **YAML 执行方案（机器可读）**
+
+`capability_gaps` 字段为**信息性字段**，列出检测到缺口的技能 ID。缺口步骤仍出现在 `steps` 中，但标注 `status: gap`，调度器遇到 `status: gap` 的步骤时暂停执行并上报缺口，不中断整个方案（方便工程师审查完整流程）。
+
 ```yaml
 plan_id: "2026-03-20-001"
 steps:
   - skill: navigation.goto
+    status: gap            # 硬缺口：技能不存在，调度器到此暂停
     params: {target: "shelf_B3", avoid: ["forklift_lane"]}
     timeout_s: 15
   - skill: vision.detect
@@ -125,16 +133,32 @@ steps:
   - skill: manipulation.grasp
     params: {force_feedback: true, max_force_n: 20}
   - skill: navigation.goto
+    status: gap
     params: {target: "pack_zone_C1"}
   - skill: manipulation.place
     params: {precision_mm: 50}
 capability_gaps:
-  - "navigation.goto"
+  - skill_id: "navigation.goto"
+    gap_type: "hard"       # hard / adapter / performance
+    message: "技能不存在，需开发移动导航模块"
 ```
+
+### 4.1.1 技能命名空间规范
+
+所有技能 ID 使用两级点分命名，格式为 `<domain>.<action>`：
+
+| 域（domain） | 技能示例 | 对应现有 TaskPlanner 动作 |
+|------------|--------|----------------------|
+| `navigation` | `navigation.goto`, `navigation.dock` | `go_to`, `navigate` |
+| `manipulation` | `manipulation.grasp`, `manipulation.place`, `manipulation.assemble` | `pick`→`grasp`, `place` |
+| `vision` | `vision.detect`, `vision.segment`, `vision.localize` | `inspect` |
+| `force` | `force.push`, `force.insert` | — |
+
+现有 `TaskPlanner` 的平面动作词汇（`go_to`, `pick`, `place`, `inspect`）在扩展时通过映射表转换为新命名空间；新规划器直接使用点分格式输出。旧格式在 Phase 1 期间保持向下兼容。
 
 ### 4.2 方案版本管理
 
-每次方案生成记录版本，支持回退，与 SemanticMap 集成存储历史方案和执行结果。
+每次方案生成记录版本，支持回退。历史方案以新类型 `plan_record` 存储到 SemanticMap 中（SemanticMap 现有条目为空间对象，`plan_record` 为非空间条目，通过 `entry_type` 字段区分，YAML 持久化机制复用不变）。执行结果（成功/失败/部分完成）回写到对应 `plan_record` 条目。
 
 ---
 
@@ -142,7 +166,7 @@ capability_gaps:
 
 ### 5.1 能力注册表（RobotCapabilityRegistry）
 
-每个技能注册时声明元数据：
+每个技能注册时声明元数据（YAML 格式）：
 
 ```yaml
 skill_id: "manipulation.grasp"
@@ -159,6 +183,31 @@ performance:
 training_data:
   dataset: "grasp_warehouse_v2"
   model: "act_v1.2"
+```
+
+Python 访问接口（所有组件通过此接口查询注册表，不直接读 YAML）：
+
+```python
+from dataclasses import dataclass
+from enum import Enum
+
+class GapType(Enum):
+    HARD = "hard"           # 技能不存在
+    ADAPTER = "adapter"     # 技能不支持当前机器人
+    PERFORMANCE = "performance"  # 成功率低于阈值
+
+@dataclass
+class CapabilityResult:
+    available: bool
+    gap_type: GapType | None
+    message: str
+    success_rate: float | None
+
+class RobotCapabilityRegistry:
+    def register(self, skill_meta: dict) -> None: ...
+    def query(self, skill_id: str, robot_type: str) -> CapabilityResult: ...
+    def update_performance(self, skill_id: str, metrics: dict) -> None: ...
+    def list_gaps(self, plan_steps: list[dict], robot_type: str) -> list[CapabilityResult]: ...
 ```
 
 ### 5.2 缺口检测引擎（三层检查）
@@ -212,14 +261,20 @@ training_data:
 
 协调器负责仲裁两者控制权，防止机械臂运动时底盘意外移动。
 
+**精定位对齐实现**：到位后使用 GroundedSAM 检测货架基准标记（AprilTag 或货架固定特征点），计算末端偏差后通过 `MobileAdapter.dock()` 二次精对齐，目标精度 ±2cm。AprilTag 为首选方案，无标记时退化为颜色/形状特征。
+
 ---
 
 ## 7. 硬件适配层（Layer 4）
 
-### 7.1 RobotAdapter 统一抽象接口
+### 7.1 硬件适配器抽象接口
+
+机械臂和移动底盘职责不同，拆分为两个独立 ABC，通过 `RobotCapabilities.robot_type` 区分。
+
+**ArmAdapter（机械臂）**
 
 ```python
-class RobotAdapter(ABC):
+class ArmAdapter(ABC):
     @abstractmethod
     async def move_to_pose(self, pose: Pose6D, speed: float) -> bool: ...
     @abstractmethod
@@ -236,16 +291,43 @@ class RobotAdapter(ABC):
     def get_capabilities(self) -> RobotCapabilities: ...
 ```
 
+**MobileAdapter（移动底盘）**
+
+```python
+class MobileAdapter(ABC):
+    @abstractmethod
+    async def navigate_to(self, target: MapPoint, avoid: list[str]) -> bool: ...
+    @abstractmethod
+    async def get_pose_on_map(self) -> MapPose: ...
+    @abstractmethod
+    async def set_velocity(self, linear: float, angular: float) -> None: ...
+    @abstractmethod
+    async def dock(self, dock_pose: MapPose, precision_mm: float) -> bool: ...
+    @abstractmethod
+    async def is_ready(self) -> bool: ...
+    @abstractmethod
+    async def emergency_stop(self) -> None: ...
+    @abstractmethod
+    def get_capabilities(self) -> RobotCapabilities: ...
+```
+
+`mobile_arm` 类型的机器人同时持有一个 `ArmAdapter` 和一个 `MobileAdapter` 实例，由协调器统一管理控制权。
+
 ### 7.2 适配器插件机制
 
 每个适配器是独立包，通过 `adapter.yaml` 自动发现和注册，无需修改核心代码。
 
 **内置适配器路线图：**
-- `ur_adapter`：UR3/5/10/16（URScript + RTDE）
-- `fanuc_adapter`：FANUC 系列
-- `ros2_bridge`：通用 ROS2 桥接（覆盖长尾机器人）
-- `nav2_adapter`：ROS2 Nav2 移动底盘
-- `vda5050_adapter`：仓储行业标准 AMR 协议，接入第三方 WMS
+
+| 适配器 | 目标硬件 | 计划阶段 |
+|--------|---------|---------|
+| `agx_arm_adapter`（包装现有客户端）| AGX Arm | Phase 1 |
+| `lerobot_adapter`（包装现有客户端）| LeRobot | Phase 1 |
+| `ur_adapter` | UR3/5/10/16（URScript + RTDE）| Phase 2 |
+| `ros2_bridge` | 通用 ROS2 桥接（覆盖长尾机器人）| Phase 2 |
+| `nav2_adapter` | ROS2 Nav2 移动底盘 | Phase 2 |
+| `vda5050_adapter` | 仓储 AMR 协议，接入第三方 WMS | Phase 2 |
+| `fanuc_adapter` | FANUC 系列 | 未排期（社区贡献）|
 
 ---
 
@@ -254,9 +336,18 @@ class RobotAdapter(ABC):
 ### 8.1 失败数据自动采集
 
 任务执行时实时保存三类数据：
-1. **传感器快照**：失败前 N 帧的 RGB/Depth/点云
+1. **传感器快照**：失败前 N 帧（默认 30 帧）的 RGB/Depth/点云
 2. **机器人状态**：关节角、末端位姿、力传感器读数
 3. **任务上下文**：SceneSpec + 执行 YAML + 失败步骤 + 错误类型
+
+**存储估算（每次失败事件）：**
+- RGB 30帧 × 640×480 × 3ch ≈ 28 MB
+- Depth 30帧 × 640×480 × 2bytes ≈ 18 MB
+- 点云（稀疏）≈ 5 MB / 帧 × 5关键帧 ≈ 25 MB
+- 状态日志 + 上下文 < 1 MB
+- **合计约 70 MB / 次失败**
+
+**Phase 1 存储策略：** 本地 SSD 预留 500 GB，保留最近 30 天数据，超出则按时间戳 FIFO 淘汰。建议使用 LZ4 压缩 RGB/Depth 帧，可降低约 40%。
 
 ### 8.2 三阶段训练管道
 
@@ -284,7 +375,7 @@ class RobotAdapter(ABC):
 | 缺口检测 v1 | 仅检测硬缺口 |
 | 失败数据记录器 | 自动保存 3 类数据到本地 |
 | 训练脚本生成器 | 输出数据集需求文档和训练配置 |
-| UR 适配器 | 第一个标准适配器，验证接口设计 |
+| ArmAdapter + AGX/LeRobot 包装器 | 将现有 AGX Arm 和 LeRobot 客户端包装为 ArmAdapter 实现，验证接口设计，无需新硬件 |
 
 ### Phase 2（3-6个月）：导航 + 联合作业
 **目标：** 真实仓储场景移动底盘 + 机械臂联合作业
@@ -318,7 +409,41 @@ class RobotAdapter(ABC):
 
 ---
 
-## 10. 功能优先级总览
+## 10. 错误与缺口分类枚举
+
+调度器、仪表盘和 API 响应中统一使用以下结构化类型，不使用裸字符串：
+
+```python
+class GapType(Enum):
+    HARD = "hard"               # 技能不存在
+    ADAPTER = "adapter"         # 技能不支持当前机器人型号
+    PERFORMANCE = "performance" # 成功率低于阈值（默认 0.8）
+
+class ExecutionError(Enum):
+    SKILL_NOT_FOUND = "skill_not_found"
+    ROBOT_NOT_READY = "robot_not_ready"
+    TIMEOUT = "timeout"
+    SENSOR_FAILURE = "sensor_failure"
+    COLLISION_DETECTED = "collision_detected"
+    GRASP_FAILURE = "grasp_failure"
+    NAVIGATION_FAILURE = "navigation_failure"
+    DOCK_ALIGNMENT_FAILURE = "dock_alignment_failure"
+    PLAN_INVALID = "plan_invalid"           # LLM 输出非法 YAML
+    CAPABILITY_GAP = "capability_gap"       # 执行到 status:gap 步骤
+
+class PlanStatus(Enum):
+    DRAFT = "draft"
+    CONFIRMED = "confirmed"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    PARTIAL = "partial"         # 部分步骤成功
+    SUSPENDED = "suspended"     # 超时挂起
+```
+
+---
+
+## 11. 功能优先级总览
 
 ```
 必须做（Phase 1-2，最小可用系统）
