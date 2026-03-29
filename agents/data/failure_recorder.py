@@ -36,13 +36,29 @@ class FailureDataRecorder:
     Phase 2 will add: rgb_frames/, state_log.jsonl
     """
 
-    def __init__(self, base_dir: str, max_size_gb: float = 50.0):
+    def __init__(
+        self,
+        base_dir: str,
+        max_size_gb: float = 50.0,
+        history_file: Path | None = None,
+    ):
         self._base = Path(base_dir)
         self._max_bytes = int(max_size_gb * 1024 ** 3)
         self._base.mkdir(parents=True, exist_ok=True)
+        self._history_file: Path | None = Path(history_file) if history_file else None
 
-    async def record(self, record: FailureRecord) -> str:
-        """Save failure record to disk. Returns the directory path."""
+    async def record(
+        self,
+        record: FailureRecord,
+        memory: object | None = None,   # Optional[RobotMemoryState]
+    ) -> str:
+        """Save failure record to disk. Returns the directory path.
+
+        Args:
+            record: The failure data to persist.
+            memory: Optional RobotMemoryState — if provided, calls
+                    task_graph.mark_failed(record.failed_step_id).
+        """
         record_dir = self._base / record.failure_id
         record_dir.mkdir(parents=True, exist_ok=True)
 
@@ -62,6 +78,19 @@ class FailureDataRecorder:
             (record_dir / "plan.yaml").write_text(record.plan_yaml)
 
         await asyncio.to_thread(_write_files)
+
+        # Phase B3: 可选写入 HISTORY.md（供 TaskPlanner 检索历史失败）
+        if self._history_file is not None:
+            from agents.memory.failure_log import append_failure_to_history
+            append_failure_to_history(record, self._history_file)
+
+        # 更新 RobotMemoryState 的任务图状态
+        if memory is not None and hasattr(memory, "task_graph"):
+            try:
+                memory.task_graph.mark_failed(record.failed_step_id)
+            except Exception:
+                pass
+
         return str(record_dir)
 
     def list_records(self) -> list[str]:

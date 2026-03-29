@@ -86,6 +86,9 @@
 | EventBus | 事件总线 | ✅ |
 | DistributedEventBus | 分布式事件总线 | ✅ |
 | SkillGenerator | Skill代码生成器 | ✅ |
+| CoTTaskPlanner | 五步 CoT 推理规划器（论文 §3.1） | ✅ |
+| SubtaskMonitor | 部署时过程监督（论文 §3.3） | ✅ |
+| ConversationalSceneAgent | LLM 驱动的多轮对话式 SceneSpec 填写 | ✅ |
 
 ### 工具
 
@@ -120,6 +123,140 @@
 |------|------|------|
 | FailureDataRecorder | 失败时自动保存`metadata.json` + `scene_spec.yaml` + `plan.yaml` | ✅ |
 | TrainingScriptGenerator | 根据能力缺口生成数据集需求报告和bash训练脚本 | ✅ |
+| EAPOrchestrator | 基于纠缠动作对（EAP）的自主数据采集（论文 §3.2） | ✅ |
+| TrajectoryRecorder | EAP + 部署轨迹回流至 LeRobot 兼容数据集 | ✅ |
+
+---
+
+## RoboClaw 集成（论文实现）
+
+> 基于论文 [*RoboClaw: An Agentic Framework for Scalable Long-Horizon Robotic Tasks*](https://arxiv.org/abs/2506.00000) 实现
+
+### LLM 多 Provider 支持（Phase A）
+
+```python
+from agents.llm.ollama_provider import OllamaProvider
+from agents.llm.litellm_provider import LiteLLMProvider
+
+# 本地 Ollama
+provider = OllamaProvider(model="qwen2.5:3b")
+
+# 云端 LLM（Claude / GPT / Gemini）
+provider = LiteLLMProvider(model="claude-3-5-haiku-20241022")
+
+# 注入 TaskPlanner
+from agents.components.task_planner import TaskPlanner
+planner = TaskPlanner(llm_provider=provider)
+```
+
+通过 `config/llm_config.yaml` 配置 provider 和模型。
+
+### 结构化机器人记忆（Phase B）
+
+论文 §3.1：`m_t = (r_t, g_t, w_t)` — 角色身份、任务图、工作记忆。
+
+```python
+from agents.memory.robot_memory import RobotMemoryState
+
+memory = RobotMemoryState.create_for_task(
+    global_task="抓取红色杯子并放到货架上",
+    subtask_descriptions=["导航到桌子", "抓取杯子", "导航到货架", "放置杯子"],
+)
+
+# 注入 TaskPlanner，实现上下文感知规划
+planner = TaskPlanner(llm_provider=provider, robot_memory=memory)
+```
+
+### CoT 五步推理规划（Phase B）
+
+```python
+from agents.components.cot_planner import CoTTaskPlanner
+
+planner = CoTTaskPlanner(provider=provider)
+decision = await planner.decide_next_action(memory=memory, observation="检测到红色杯子")
+print(decision.skill_id)    # e.g. "manipulation.grasp"
+print(decision.task_state)  # PROGRESSING | SATISFIED | STUCK
+```
+
+### 多平台消息渠道（Phase C）
+
+```python
+from agents.channels.bus import MessageBus
+from agents.channels.telegram_channel import TelegramChannel
+from agents.events.bus import EventBus
+
+bus = MessageBus()
+# Telegram 渠道（需要 python-telegram-bot>=21.0）
+channel = TelegramChannel(bus, token="YOUR_BOT_TOKEN")
+await channel.start()
+
+# EventBus → MessageBus 桥接（HIGH/CRITICAL 事件自动推送）
+event_bus = EventBus()
+event_bus.set_outbound_bridge(bus, chat_id="123456789", channel="telegram")
+```
+
+通过 `config/channels_config.yaml` 配置 Telegram/飞书渠道。
+
+### EAP 自主数据采集（Phase D）
+
+论文 §3.2：纠缠动作对，人工干预降低 **8.04×**。
+
+```python
+from agents.data.eap import EAPPair, EAPPolicy
+from agents.data.eap_orchestrator import EAPOrchestrator
+
+pair = EAPPair(
+    task_name="pick_and_place",
+    forward=EAPPolicy("fwd-1", "forward", "manipulation.grasp", "抓取{物体}", "物体已抓取"),
+    reverse=EAPPolicy("rev-1", "reverse", "manipulation.place_back", "归还{物体}", "物体已归位"),
+)
+orchestrator = EAPOrchestrator(pair=pair, cot_planner=planner, skill_registry=registry, bus=bus, memory=memory)
+trajectories = await orchestrator.run_collection_loop(target_trajectories=50)
+```
+
+### 部署时过程监督（Phase E）
+
+论文 §3.3：长时序任务成功率提升 **25%**。
+
+```python
+from agents.components.subtask_monitor import SubtaskMonitor
+
+monitor = SubtaskMonitor(cot_planner=planner, memory=memory, stuck_threshold=3)
+result = await monitor.monitor_subtask(subtask, skill_execution_coro)
+# result.outcome: "success" | "stuck" | "switched"
+```
+
+### Skill 格式统一（Phase F）
+
+```yaml
+---
+name: manipulation.grasp
+requires:
+  bins: ["lerobot"]
+  env: ["LEROBOT_HOST"]
+metadata:
+  eap:
+    has_reverse: true
+    reverse_skill: "manipulation.reverse_grasp"
+---
+```
+
+详见 [docs/skill_format.md](skill_format.md)。
+
+### 对话式 Onboarding（Phase G）
+
+```python
+from agents.components.voice_template_agent import ConversationalSceneAgent
+
+agent = ConversationalSceneAgent(llm_provider=provider)
+spec = await agent.fill_from_utterance("抓取桌上的红色杯子", send_fn, recv_fn)
+print(spec.scene_type)    # "pick"
+print(spec.is_complete()) # True
+
+# 硬件自动扫描
+from agents.hardware.scanner import HardwareScanner
+result = await HardwareScanner().scan_and_register(registry)
+```
 
 ---
 

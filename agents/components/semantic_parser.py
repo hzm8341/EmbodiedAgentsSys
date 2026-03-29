@@ -4,10 +4,13 @@
 解析语音/文本指令为结构化动作，支持 LLM 增强和规则 fallback。
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 import re
 import json
 import asyncio
+
+if TYPE_CHECKING:
+    from agents.llm.provider import LLMProvider
 
 
 class SemanticParser:
@@ -32,16 +35,23 @@ class SemanticParser:
 
     VALID_INTENTS = ["motion", "grasp", "place", "task", "gripper", "reach", "move"]
 
-    def __init__(self, use_llm: bool = True, ollama_model: str = "qwen2.5:3b"):
+    def __init__(
+        self,
+        use_llm: bool = True,
+        ollama_model: str = "qwen2.5:3b",
+        llm_provider: Optional["LLMProvider"] = None,
+    ):
         """初始化语义解析器
 
         Args:
             use_llm: 是否使用 LLM 增强解析
             ollama_model: Ollama 模型名称
+            llm_provider: 可选 LLMProvider，优先级高于直接 ollama 调用
         """
         self.use_llm = use_llm
         self._ollama_client = None
         self._ollama_model = ollama_model
+        self._llm_provider = llm_provider
 
         if use_llm:
             self._init_ollama()
@@ -99,6 +109,21 @@ class SemanticParser:
 指令: {text}
 只输出JSON，不要其他内容:"""
 
+        # 若有 llm_provider，优先使用它
+        if self._llm_provider is not None:
+            try:
+                response_text = await self._llm_provider.chat_with_retry(
+                    user=prompt,
+                )
+                response_text = response_text.strip()
+                parsed = json.loads(response_text)
+                if parsed.get("intent") in self.VALID_INTENTS:
+                    return parsed
+            except Exception:
+                pass
+            return None
+
+        # 原有 ollama 调用路径（向后兼容）
         try:
             response = self._ollama_client.generate(
                 model=self._ollama_model, prompt=prompt, options={"num_predict": 128}

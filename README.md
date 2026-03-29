@@ -86,6 +86,9 @@
 | EventBus | Event bus | ✅ |
 | DistributedEventBus | Distributed event bus | ✅ |
 | SkillGenerator | Skill code generator | ✅ |
+| CoTTaskPlanner | 5-step CoT reasoning planner (Paper §3.1) | ✅ |
+| SubtaskMonitor | Deployment-time process supervision (Paper §3.3) | ✅ |
+| ConversationalSceneAgent | LLM-driven conversational SceneSpec filling | ✅ |
 
 ### Tools
 
@@ -105,6 +108,7 @@
 | LeRobotArmAdapter | LeRobot arm adapter (reuses LeRobotClient) | ✅ |
 | RobotCapabilityRegistry | YAML-driven skills registry, supports querying capabilities by `robot_type`, returns `GapType` enum | ✅ |
 | GapDetectionEngine | Classifies execution plan steps with hard-gap annotations, outputs `GapReport` | ✅ |
+| HardwareScanner | Auto-scan serial ports and cameras, register to capability registry | ✅ |
 
 ### Planning Layer Extensions (Phase 1)
 
@@ -120,6 +124,178 @@
 |--------|-------------|--------|
 | FailureDataRecorder | Auto-saves `metadata.json` + `scene_spec.yaml` + `plan.yaml` on failure | ✅ |
 | TrainingScriptGenerator | Generates dataset requirements report and bash training scripts based on capability gaps | ✅ |
+| EAPOrchestrator | Autonomous data collection via Entangled Action Pairs (Paper §3.2) | ✅ |
+| TrajectoryRecorder | Saves EAP + deployment trajectories to LeRobot-compatible dataset format | ✅ |
+
+---
+
+## RoboClaw Integration (Paper Implementation)
+
+> Based on [*RoboClaw: An Agentic Framework for Scalable Long-Horizon Robotic Tasks*](https://arxiv.org/abs/2506.00000)
+
+### LLM Multi-Provider (Phase A)
+
+```python
+from agents.llm.provider import LLMProvider, GenerationSettings
+from agents.llm.ollama_provider import OllamaProvider
+from agents.llm.litellm_provider import LiteLLMProvider
+
+# Ollama (local)
+provider = OllamaProvider(model="qwen2.5:3b", host="http://localhost:11434")
+
+# Cloud LLM (Claude / GPT / Gemini) via LiteLLM
+provider = LiteLLMProvider(model="claude-3-5-haiku-20241022")
+
+# Inject into TaskPlanner
+from agents.components.task_planner import TaskPlanner
+planner = TaskPlanner(llm_provider=provider)
+```
+
+Configure via `config/llm_config.yaml`:
+```yaml
+provider: ollama        # ollama | litellm
+model: qwen2.5:3b
+```
+
+### Structured Robot Memory (Phase B)
+
+Paper §3.1: `m_t = (r_t, g_t, w_t)` — Role Identity, Task Graph, Working Memory.
+
+```python
+from agents.memory.robot_memory import RobotMemoryState
+
+memory = RobotMemoryState.create_for_task(
+    global_task="Pick red cup and place on shelf",
+    subtask_descriptions=["navigate to table", "grasp cup", "navigate to shelf", "place cup"],
+    robot_type="mobile_arm",
+)
+
+# Inject memory into TaskPlanner for context-aware planning
+planner = TaskPlanner(llm_provider=provider, robot_memory=memory)
+```
+
+### CoT 5-Step Reasoning Planner (Phase B)
+
+```python
+from agents.components.cot_planner import CoTTaskPlanner
+
+planner = CoTTaskPlanner(provider=provider)
+decision = await planner.decide_next_action(
+    memory=memory,
+    observation="Red cup detected at position [0.3, 0.1, 0.5]",
+)
+print(decision.skill_id)       # e.g. "manipulation.grasp"
+print(decision.task_state)     # PROGRESSING | SATISFIED | STUCK
+```
+
+### Multi-Platform Messaging Channels (Phase C)
+
+AgentLoop integrates with Telegram, Feishu (Lark) and CLI channels.
+
+```python
+from agents.channels.bus import MessageBus
+from agents.channels.agent_loop import AgentLoop
+from agents.channels.telegram_channel import TelegramChannel
+
+bus = MessageBus()
+
+# Optional: Telegram channel (requires python-telegram-bot>=21.0)
+channel = TelegramChannel(bus, token="YOUR_BOT_TOKEN", allow_from=["123456789"])
+await channel.start()
+
+# EventBus → MessageBus bridge for HIGH/CRITICAL events
+from agents.events.bus import EventBus
+event_bus = EventBus()
+event_bus.set_outbound_bridge(bus, chat_id="123456789", channel="telegram")
+```
+
+Configure via `config/channels_config.yaml`.
+
+### EAP Autonomous Data Collection (Phase D)
+
+Paper §3.2: Self-Resetting Data Collection via Entangled Action Pairs — reduces human interventions by **8.04×**.
+
+```python
+from agents.data.eap import EAPPair, EAPPolicy
+from agents.data.eap_orchestrator import EAPOrchestrator
+
+pair = EAPPair(
+    task_name="pick_and_place",
+    forward=EAPPolicy("fwd-1", "forward", "manipulation.grasp", "Grasp the {object}", "Object is grasped"),
+    reverse=EAPPolicy("rev-1", "reverse", "manipulation.place_back", "Place back {object}", "Object returned"),
+)
+
+orchestrator = EAPOrchestrator(pair=pair, cot_planner=planner, skill_registry=registry, bus=bus, memory=memory)
+trajectories = await orchestrator.run_collection_loop(target_trajectories=50)
+```
+
+### Deployment-Time Process Supervision (Phase E)
+
+Paper §3.3: Continuous monitoring during skill execution — improves long-horizon task success by **25%**.
+
+```python
+from agents.components.subtask_monitor import SubtaskMonitor
+
+monitor = SubtaskMonitor(
+    cot_planner=planner,
+    memory=memory,
+    check_interval_sec=2.0,
+    stuck_threshold=3,     # switch policy after 3 consecutive stuck evaluations
+)
+
+result = await monitor.monitor_subtask(subtask, skill_execution_coro)
+# result.outcome: "success" | "failed" | "stuck" | "switched"
+```
+
+### Skill Format with EAP Metadata (Phase F)
+
+```yaml
+---
+name: manipulation.grasp
+description: "Grasp specified object"
+requires:
+  bins: ["lerobot"]
+  env: ["LEROBOT_HOST"]
+always: false
+metadata:
+  eap:
+    has_reverse: true
+    reverse_skill: "manipulation.reverse_grasp"
+---
+```
+
+Check availability programmatically:
+```python
+from agents.skills.md_skill_adapter import MDSkillManager
+
+manager = MDSkillManager(skills_dir="skills/")
+available, missing = manager.check_availability("manipulation.grasp")
+# available: False, missing: ["bin:lerobot", "env:LEROBOT_HOST"]
+```
+
+See [docs/skill_format.md](docs/skill_format.md) for full spec.
+
+### Conversational Onboarding (Phase G)
+
+```python
+from agents.components.voice_template_agent import ConversationalSceneAgent
+
+agent = ConversationalSceneAgent(llm_provider=provider)
+
+# Fill SceneSpec from a single natural-language utterance
+spec = await agent.fill_from_utterance(
+    utterance="抓取桌上的红色杯子",
+    send_fn=your_send_function,
+    recv_fn=your_receive_function,
+)
+print(spec.scene_type)        # "pick"
+print(spec.is_complete())     # True after follow-up questions
+
+# Auto-scan hardware
+from agents.hardware.scanner import HardwareScanner
+scanner = HardwareScanner()
+result = await scanner.scan_and_register(registry, config_path=Path("config/setup.json"))
+```
 
 ---
 
@@ -149,6 +325,19 @@ pip install -e .
 
 ```bash
 pip install -e .
+```
+
+Optional dependencies for RoboClaw integration features:
+
+```bash
+# Cloud LLM providers (Claude, GPT, Gemini)
+pip install -e ".[llm]"
+
+# Telegram + Feishu messaging channels
+pip install -e ".[channels]"
+
+# All optional dependencies
+pip install -e ".[all]"
 ```
 
 ---

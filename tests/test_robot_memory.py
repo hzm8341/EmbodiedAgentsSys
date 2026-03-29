@@ -282,7 +282,7 @@ def test_decide_next_action_uses_provider():
             observation="Cup is on the table",
         )
 
-    decision = asyncio.get_event_loop().run_until_complete(run())
+    decision = asyncio.run(run())
     assert decision.action_name == "manipulation.grasp"
     assert decision.task_state == TaskState.PROGRESSING
 
@@ -303,7 +303,7 @@ def test_decide_next_action_llm_error_returns_call_human():
     async def run():
         return await planner.decide_next_action(memory=memory, observation="obs")
 
-    decision = asyncio.get_event_loop().run_until_complete(run())
+    decision = asyncio.run(run())
     assert decision.action_type == "call_human"
     assert decision.task_state == TaskState.STUCK
 
@@ -319,7 +319,7 @@ def test_decompose_task_parses_json_array():
     async def run():
         return await planner.decompose_task("Pick up cup and place on shelf")
 
-    subtasks = asyncio.get_event_loop().run_until_complete(run())
+    subtasks = asyncio.run(run())
     assert len(subtasks) == 3
     assert "Grasp cup" in subtasks
 
@@ -331,7 +331,7 @@ def test_decompose_task_handles_json_with_extra_text():
     async def run():
         return await planner.decompose_task("task")
 
-    subtasks = asyncio.get_event_loop().run_until_complete(run())
+    subtasks = asyncio.run(run())
     assert subtasks == ["step 1", "step 2"]
 
 
@@ -357,7 +357,7 @@ def test_failure_log_append_and_read():
             await log.append(record)
             return await log.read_all()
 
-        records = asyncio.get_event_loop().run_until_complete(run())
+        records = asyncio.run(run())
         assert len(records) == 1
         assert records[0].error_type == "grasp_failure"
         assert records[0].subtask_id == "st_01"
@@ -379,7 +379,7 @@ def test_failure_log_read_recent():
                 await log.append(r)
             return await log.read_recent(n=3)
 
-        records = asyncio.get_event_loop().run_until_complete(run())
+        records = asyncio.run(run())
         assert len(records) == 3
         assert records[-1].task_description == "task_4"
 
@@ -399,6 +399,6 @@ def test_failure_log_summary_for_prompt():
             await log.append(r)
             return await log.summary_for_prompt()
 
-        summary = asyncio.get_event_loop().run_until_complete(run())
+        summary = asyncio.run(run())
         assert "Grasp cup" in summary
         assert "collision" in summary

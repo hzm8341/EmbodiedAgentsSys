@@ -2,6 +2,31 @@
 Changelog for package automatika_embodied_agents
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.6.0 (2026-03-28)
+------------------
+* (feature) Implements RoboClaw paper integration (Phases A-G)
+* (feature) Adds LLM multi-provider abstraction: OllamaProvider + LiteLLMProvider + registry (Phase A)
+* (feature) Injects LLMProvider into TaskPlanner and SemanticParser, replacing hardcoded Ollama calls
+* (feature) Adds structured robot memory m_t=(r_t, g_t, w_t): RoleIdentity, TaskGraph, WorkingMemory (Phase B, Paper §3.1)
+* (feature) Adds CoTTaskPlanner with 5-step chain-of-thought reasoning (Phase B, Paper §3.1)
+* (feature) Integrates robot memory context injection into TaskPlanner._build_prompt()
+* (feature) Adds MessageBus + AgentLoop ported from RoboClaw (Phase C)
+* (feature) Adds BaseChannel ABC + TelegramChannel + FeishuChannel (Phase C, optional deps)
+* (feature) Adds EventBus.set_outbound_bridge() for HIGH/CRITICAL event forwarding to MessageBus (Phase C)
+* (feature) Adds EAPOrchestrator for autonomous data collection via Entangled Action Pairs (Phase D, Paper §3.2)
+* (feature) Adds TrajectoryRecorder for EAP and deployment trajectory storage in LeRobot format (Phase D/E)
+* (feature) Adds SubtaskMonitor for deployment-time process supervision and policy switching (Phase E, Paper §3.3)
+* (feature) Extends MDSkillConfig with requires_bins/env/always/eap_has_reverse/eap_reverse_skill fields (Phase F)
+* (feature) Adds MDSkillManager.check_availability() and discover_skills_with_availability() (Phase F)
+* (feature) Adds ConversationalSceneAgent for LLM-driven multi-turn SceneSpec filling (Phase G)
+* (feature) Extends SceneSpec with from_partial(), is_complete(), missing_fields() (Phase G)
+* (feature) Adds HardwareScanner for auto-scanning serial ports and cameras (Phase G)
+* (feature) Integrates FailureDataRecorder with HISTORY.md append and RobotMemoryState.task_graph update (Phase B3)
+* (chore) Adds config/llm_config.yaml and config/channels_config.yaml configuration templates
+* (docs) Adds docs/skill_format.md Skill frontmatter specification
+* (test) Adds 103 tests covering LLM provider, robot memory, channels, skill format, and onboarding
+* Contributors: Claude Code
+
 0.5.1 (2026-02-16)
 ------------------
 * (feature) Adds a record_video action to the Vision component

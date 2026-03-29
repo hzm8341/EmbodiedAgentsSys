@@ -80,7 +80,7 @@ def test_eap_orchestrator_collects_target():
         orch = EAPOrchestrator(config=config, skill_runner=runner)
         return await orch.run_collection_loop()
 
-    trajectories, stats = asyncio.get_event_loop().run_until_complete(run())
+    trajectories, stats = asyncio.run(run())
     assert len(trajectories) == 3
     assert stats.successful_forward == 3
     assert stats.success_rate == 1.0
@@ -110,7 +110,7 @@ def test_eap_orchestrator_retries_and_calls_human():
         )
         return await orch.run_collection_loop()
 
-    trajectories, stats = asyncio.get_event_loop().run_until_complete(run())
+    trajectories, stats = asyncio.run(run())
     # No successful trajectories
     assert len(trajectories) == 0
     assert stats.human_interventions > 0
@@ -139,7 +139,7 @@ def test_eap_orchestrator_callback():
         )
         return await orch.run_collection_loop()
 
-    trajectories, stats = asyncio.get_event_loop().run_until_complete(run())
+    trajectories, stats = asyncio.run(run())
     assert len(callbacks) == 2
     assert callbacks == [1, 2]
 
@@ -176,7 +176,7 @@ def test_trajectory_recorder_save_eap():
         async def run():
             return await recorder.save_eap_trajectory(traj)
 
-        paths = asyncio.get_event_loop().run_until_complete(run())
+        paths = asyncio.run(run())
         assert len(paths) == 2
         assert all(p.exists() for p in paths)
         assert any("forward" in str(p) for p in paths)
@@ -193,7 +193,7 @@ def test_trajectory_recorder_load_episode():
             forward_path = next(p for p in paths if "forward" in str(p))
             return await recorder.load_episode(forward_path)
 
-        header, steps = asyncio.get_event_loop().run_until_complete(run())
+        header, steps = asyncio.run(run())
         assert header["type"] == "episode_info"
         assert header["success"] is True
         assert header["num_steps"] == 5
@@ -218,7 +218,7 @@ def test_trajectory_recorder_save_deployment():
                 metadata={"robot_id": "arm_01"},
             )
 
-        path = asyncio.get_event_loop().run_until_complete(run())
+        path = asyncio.run(run())
         assert path.exists()
         assert "deployment" in str(path)
 
@@ -235,7 +235,7 @@ def test_trajectory_recorder_count_episodes():
                 traj.reverse.finalize(success=True)
                 await recorder.save_eap_trajectory(traj)
 
-        asyncio.get_event_loop().run_until_complete(run())
+        asyncio.run(run())
         # 3 cycles × 1 file (forward only, reverse has no steps) = 3
         count = recorder.count_episodes("grasp", phase="eap")
         assert count == 3
@@ -269,7 +269,7 @@ def test_subtask_monitor_skill_success():
             skill_execution_coro=_successful_skill(),
         )
 
-    result = asyncio.get_event_loop().run_until_complete(run())
+    result = asyncio.run(run())
     assert result.success
     assert result.intervention_reason == InterventionReason.SKILL_SUCCESS
 
@@ -283,7 +283,7 @@ def test_subtask_monitor_skill_failure():
             skill_execution_coro=_failing_skill(),
         )
 
-    result = asyncio.get_event_loop().run_until_complete(run())
+    result = asyncio.run(run())
     assert not result.success
     assert result.intervention_reason == InterventionReason.SKILL_FAILURE
 
@@ -303,7 +303,7 @@ def test_subtask_monitor_timeout():
             skill_execution_coro=_slow_skill(),
         )
 
-    result = asyncio.get_event_loop().run_until_complete(run())
+    result = asyncio.run(run())
     assert not result.success
     assert result.intervention_reason == InterventionReason.TIMEOUT
     assert len(human_calls) > 0
@@ -335,7 +335,7 @@ def test_subtask_monitor_joint_error():
             skill_execution_coro=_slow_skill(),
         )
 
-    result = asyncio.get_event_loop().run_until_complete(run())
+    result = asyncio.run(run())
     assert not result.success
     assert result.intervention_reason == InterventionReason.JOINT_ERROR
     assert len(human_calls) > 0
@@ -356,6 +356,6 @@ def test_subtask_monitor_force_anomaly():
             skill_execution_coro=_slow_skill(),
         )
 
-    result = asyncio.get_event_loop().run_until_complete(run())
+    result = asyncio.run(run())
     assert not result.success
     assert result.intervention_reason == InterventionReason.FORCE_ANOMALY

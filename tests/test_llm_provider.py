@@ -182,7 +182,7 @@ def test_chat_with_retry_uses_generation_defaults():
     async def run():
         return await provider.chat_with_retry([{"role": "user", "content": "hi"}])
 
-    resp = asyncio.get_event_loop().run_until_complete(run())
+    resp = asyncio.run(run())
     assert resp.content == "ok"
     assert provider.call_count == 1
 
@@ -193,7 +193,7 @@ def test_chat_with_retry_retries_on_transient_error():
     async def run():
         return await provider.chat_with_retry([{"role": "user", "content": "hi"}])
 
-    resp = asyncio.get_event_loop().run_until_complete(run())
+    resp = asyncio.run(run())
     assert resp.content == "recovered"
     assert provider.call_count == 2
 
@@ -216,7 +216,7 @@ def test_chat_with_retry_stops_on_non_transient_error():
     async def run():
         return await provider.chat_with_retry([{"role": "user", "content": "hi"}])
 
-    resp = asyncio.get_event_loop().run_until_complete(run())
+    resp = asyncio.run(run())
     assert resp.finish_reason == "error"
     assert provider.call_count == 1  # no retry for non-transient
 

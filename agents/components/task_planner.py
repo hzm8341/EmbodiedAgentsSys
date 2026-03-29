@@ -3,9 +3,14 @@
 import json
 import asyncio
 from dataclasses import dataclass, field
-from typing import List, Optional, Literal
+from pathlib import Path
+from typing import List, Optional, Literal, TYPE_CHECKING
 
 from .semantic_map import SemanticMap
+
+if TYPE_CHECKING:
+    from agents.llm.provider import LLMProvider
+    from agents.memory.robot_memory import RobotMemoryState
 
 
 @dataclass
@@ -78,6 +83,9 @@ class TaskPlanner:
         backend: Literal["ollama", "mock"] = "ollama",
         semantic_map: Optional[SemanticMap] = None,
         strategy: Optional[str] = None,
+        llm_provider: Optional["LLMProvider"] = None,
+        robot_memory: Optional["RobotMemoryState"] = None,
+        history_file: Optional[Path] = None,
     ):
         self._model = ollama_model
         self._backend = backend
@@ -85,6 +93,9 @@ class TaskPlanner:
         self._strategy = strategy
         self._failure_history: List[str] = []
         self._ollama_client = None
+        self._llm_provider = llm_provider
+        self.robot_memory = robot_memory
+        self.history_file = history_file
 
         if backend == "ollama":
             self._init_ollama()
@@ -123,6 +134,11 @@ class TaskPlanner:
 
     def _build_prompt(self, instruction: str) -> str:
         """构建包含历史和地图上下文的 prompt。"""
+        # 如有 robot_memory，prepend 记忆上下文
+        memory_block = ""
+        if self.robot_memory is not None:
+            memory_block = self.robot_memory.to_context_block() + "\n\n"
+
         parts = [f"指令：{instruction}"]
 
         if self._semantic_map:
@@ -133,7 +149,7 @@ class TaskPlanner:
             parts.extend(f"  {h}" for h in self._failure_history[-5:])  # 最多 5 条
 
         parts.append("请输出执行计划（JSON 数组）：")
-        return "\n".join(parts)
+        return memory_block + "\n".join(parts)
 
     # ---------- 规划 ----------
 
@@ -175,6 +191,31 @@ class TaskPlanner:
             actions = self._mock_plan(instruction)
             return TaskPlan(actions=actions, instruction=instruction)
 
+        # 若有 llm_provider，优先使用它替代直接 ollama 调用
+        if self._llm_provider is not None:
+            try:
+                text = await self._llm_provider.chat_with_retry(
+                    system=_SYSTEM_PROMPT,
+                    user=prompt,
+                )
+                actions = self._parse_plan_json(text)
+                if not actions:
+                    return TaskPlan(
+                        actions=[],
+                        instruction=instruction,
+                        success=False,
+                        error=f"LLM 输出无法解析为动作列表: {text[:200]}",
+                    )
+                return TaskPlan(actions=actions, instruction=instruction)
+            except Exception as e:
+                return TaskPlan(
+                    actions=[],
+                    instruction=instruction,
+                    success=False,
+                    error=str(e),
+                )
+
+        # 原有 ollama 调用路径（向后兼容）
         try:
             loop = asyncio.get_running_loop()
             response = await loop.run_in_executor(

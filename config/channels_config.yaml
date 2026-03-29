@@ -1,0 +1,16 @@
+# 消息渠道配置（所有渠道均为 optional）
+telegram:
+  enabled: false
+  token: ""               # 填入 Bot Token
+  allow_from: []          # 空列表 = 允许所有人；填入 user_id 字符串列表进行白名单
+  send_progress: true
+
+feishu:
+  enabled: false
+  app_id: ""              # 飞书应用 App ID
+  app_secret: ""          # 飞书应用 App Secret
+  allow_from: ["*"]       # "*" 表示允许所有人
+  send_progress: true
+
+# 通用设置
+max_message_length: 4000   # 单条消息最大字符数

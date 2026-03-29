@@ -1,0 +1,17 @@
+# LLM Provider 配置
+provider: ollama          # ollama | litellm
+model: qwen2.5:3b
+api_key: ""               # 留空则读取环境变量 OPENAI_API_KEY / ANTHROPIC_API_KEY
+api_base: ""              # 留空则使用 provider 默认值
+max_tokens: 512
+temperature: 0.1
+retry_delays: [1, 2, 4]
+
+# Ollama 专用配置
+ollama:
+  host: "http://localhost:11434"
+  timeout: 60
+
+# LiteLLM 专用配置（provider=litellm 时生效）
+litellm:
+  model: "claude-3-5-haiku-20241022"   # 默认 Claude Haiku

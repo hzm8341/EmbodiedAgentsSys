@@ -17,20 +17,52 @@
 import os
 import re
 import ast
+import shutil
 import logging
 import importlib
 from pathlib import Path
-from typing import Any, Dict, Optional, List, Callable, Type
+from typing import Any, Dict, Optional, List, Callable, Tuple, Type
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 
-from agents.skills import (
-    BaseSkill,
-    SkillMetadata,
-    SkillResult,
-    SkillStatus,
-    skill_registry,
-)
+def _make_stub_base_skill():
+    """创建占位符 BaseSkill 类，在完整环境不可用时使用。"""
+    class BaseSkill:
+        """占位符 BaseSkill，在完整环境不可用时使用。"""
+        pass
+    return BaseSkill
+
+
+try:
+    # 优先从顶层 agents.skills 模块（agents/skills.py）导入
+    from agents.skills import (
+        BaseSkill,
+        SkillMetadata,
+        SkillResult,
+        SkillStatus,
+        skill_registry,
+    )
+    # 确保 BaseSkill 确实是一个可用的类，而非 None
+    if BaseSkill is None:
+        raise ImportError("BaseSkill is None in agents.skills")
+except (ImportError, Exception):
+    # 回退：尝试从 agents 包的 skills 子模块导入
+    try:
+        from agents import skills as _skills_mod
+        BaseSkill = getattr(_skills_mod, "BaseSkill", None)
+        SkillMetadata = getattr(_skills_mod, "SkillMetadata", None)
+        SkillResult = getattr(_skills_mod, "SkillResult", None)
+        SkillStatus = getattr(_skills_mod, "SkillStatus", None)
+        skill_registry = getattr(_skills_mod, "skill_registry", None)
+        if BaseSkill is None:
+            raise ImportError("BaseSkill is None in agents submodule")
+    except (ImportError, Exception):
+        # 最终回退：定义占位符，允许在不依赖完整环境时使用 MDSkillConfig/MDSkillManager
+        BaseSkill = _make_stub_base_skill()  # type: ignore
+        SkillMetadata = None  # type: ignore
+        SkillResult = None  # type: ignore
+        SkillStatus = None  # type: ignore
+        skill_registry = None  # type: ignore
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -55,6 +87,13 @@ class MDSkillConfig:
     when_to_use: List[str] = field(default_factory=list)
     safety_notes: List[str] = field(default_factory=list)
     extra: Dict[str, Any] = field(default_factory=dict)
+    # 依赖检查字段
+    requires_bins: List[str] = field(default_factory=list)   # 需要的 CLI 工具（用 shutil.which 检查）
+    requires_env: List[str] = field(default_factory=list)    # 需要的环境变量
+    always: bool = False                                      # 是否始终加载到 context
+    # EAP 扩展字段（论文 §3.2）
+    eap_has_reverse: bool = False                            # 是否存在配对的 reset 策略
+    eap_reverse_skill: str = ""                              # 配对的逆向 skill id
 
 
 @dataclass
@@ -184,11 +223,35 @@ class SKILLMDParser(MDParser):
 
         frontmatter = yaml.safe_load(match.group(1))
 
-        return MDSkillConfig(
+        config = MDSkillConfig(
             name=frontmatter.get("name", ""),
             description=frontmatter.get("description", ""),
             metadata=frontmatter.get("metadata", {}),
         )
+
+        # 解析 requires 字段
+        requires = frontmatter.get("requires", {})
+        if isinstance(requires, dict):
+            config.requires_bins = requires.get("bins", [])
+            config.requires_env = requires.get("env", [])
+
+        # 解析 always 字段
+        config.always = bool(frontmatter.get("always", False))
+
+        # 解析顶层 eap 字段
+        eap = frontmatter.get("eap", {})
+        if isinstance(eap, dict):
+            config.eap_has_reverse = bool(eap.get("has_reverse", False))
+            config.eap_reverse_skill = eap.get("reverse_skill", "")
+
+        # 解析 metadata.eap 字段（兼容嵌套格式）
+        if not config.eap_has_reverse:
+            meta_eap = config.metadata.get("eap", {})
+            if isinstance(meta_eap, dict):
+                config.eap_has_reverse = bool(meta_eap.get("has_reverse", False))
+                config.eap_reverse_skill = meta_eap.get("reverse_skill", "")
+
+        return config
 
     def _parse_section(self, content: str, header: str) -> List[str]:
         rules = []
@@ -448,6 +511,46 @@ class MDSkillManager:
             }
             for name, config in self.loaded_configs.items()
         }
+
+    def get_skill_config(self, skill_name: str) -> Optional[MDSkillConfig]:
+        """获取已加载的 skill 配置，不存在时返回 None。"""
+        return self.loaded_configs.get(skill_name)
+
+    def check_availability(self, skill_name: str) -> Tuple[bool, List[str]]:
+        """检查 skill 的依赖是否满足。
+
+        Returns:
+            (available: bool, missing_deps: list[str])
+        """
+        config = self.get_skill_config(skill_name)
+        if config is None:
+            return False, [f"skill '{skill_name}' not found"]
+
+        missing: List[str] = []
+        for bin_name in config.requires_bins:
+            if shutil.which(bin_name) is None:
+                missing.append(f"bin:{bin_name}")
+        for env_name in config.requires_env:
+            if not os.getenv(env_name):
+                missing.append(f"env:{env_name}")
+
+        return len(missing) == 0, missing
+
+    def discover_skills_with_availability(self) -> List[Dict[str, Any]]:
+        """发现所有已加载的 skill 并附带可用性信息。
+
+        Returns:
+            list of dict with keys: name, available, missing_deps
+        """
+        result = []
+        for name in self.loaded_configs:
+            available, missing = self.check_availability(name)
+            result.append({
+                "name": name,
+                "available": available,
+                "missing_deps": missing,
+            })
+        return result
 
 
 # ============================================================

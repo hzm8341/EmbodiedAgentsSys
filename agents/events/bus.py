@@ -119,6 +119,9 @@ class EventBus:
                 except Exception as e:
                     print(f"Error in subscriber: {e}")
 
+        # 出站桥接：HIGH/CRITICAL 事件推送到 MessageBus
+        await self._maybe_bridge_outbound(event)
+
     def publish_sync(self, event: Event) -> None:
         """同步发布事件（在异步上下文中使用）
 
@@ -159,6 +162,38 @@ class EventBus:
         count = len(self._subscribers.get(event_type, []))
         count += len(self._priority_subscribers.get(event_type, []))
         return count
+
+    def set_outbound_bridge(
+        self,
+        bus: Any,           # MessageBus（避免循环导入，用 Any）
+        chat_id: str,
+        channel: str,
+    ) -> None:
+        """设置 EventBus → MessageBus 的出站桥接。
+
+        HIGH/CRITICAL 优先级事件自动推送到 MessageBus outbound 队列。
+        用于 asyncio + ROS2 跨线程场景。
+        """
+        self._outbound_bridge_bus = bus
+        self._outbound_bridge_chat_id = chat_id
+        self._outbound_bridge_channel = channel
+
+    async def _maybe_bridge_outbound(self, event: "Event") -> None:
+        """若已设置桥接且事件优先级 >= HIGH，推送到 MessageBus。"""
+        if not hasattr(self, "_outbound_bridge_bus"):
+            return
+        if event.priority.value < EventPriority.HIGH.value:
+            return
+        from agents.channels.events import OutboundMessage
+        msg = OutboundMessage(
+            chat_id=self._outbound_bridge_chat_id,
+            channel=self._outbound_bridge_channel,
+            text=f"[{event.type}] {str(event.data)[:200]}",
+        )
+        try:
+            await self._outbound_bridge_bus.publish_outbound(msg)
+        except Exception:
+            pass  # 桥接失败不影响主流程
 
 
 # 全局事件总线实例
