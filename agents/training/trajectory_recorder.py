@@ -52,8 +52,16 @@ class TrajectoryRecorder:
             (traj.forward, "forward"),
             (traj.reverse, "reverse"),
         ]:
-            if not trajectory.observations and not trajectory.actions:
-                continue  # skip empty trajectories
+            # Skip empty trajectories; actions are authoritative for step count
+            if not trajectory.actions:
+                continue
+            if len(trajectory.observations) != len(trajectory.actions):
+                logger.warning(
+                    "Trajectory %s/%s has mismatched observations(%d) vs actions(%d) — skipping",
+                    traj.skill_id, phase_name,
+                    len(trajectory.observations), len(trajectory.actions),
+                )
+                continue
 
             out_dir = self._data_dir / "eap" / traj.skill_id
             filename = f"episode_{traj.cycle_id:06d}_{phase_name}.ndjson"
@@ -147,11 +155,11 @@ class TrajectoryRecorder:
     async def load_episode(self, path: Path) -> tuple[dict, list[dict]]:
         """Load an episode file. Returns (header, steps)."""
         content = await asyncio.to_thread(path.read_text, "utf-8")
-        lines = [l.strip() for l in content.splitlines() if l.strip()]
-        if not lines:
+        raw_lines = [line.strip() for line in content.splitlines() if line.strip()]
+        if not raw_lines:
             return {}, []
-        header = json.loads(lines[0])
-        steps = [json.loads(l) for l in lines[1:]]
+        header = json.loads(raw_lines[0])
+        steps = [json.loads(line) for line in raw_lines[1:]]
         return header, steps
 
     def count_episodes(self, skill_id: str, phase: str = "eap") -> int:

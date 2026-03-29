@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -32,11 +32,7 @@ class FailureRecord:
     error_type: str         # e.g. "grasp_failure", "timeout", "collision"
     error_detail: str       # full error message
     robot_type: str = ""
-    scene_context: dict[str, Any] = None  # type: ignore  # env snapshot at failure
-
-    def __post_init__(self):
-        if self.scene_context is None:
-            self.scene_context = {}
+    scene_context: dict[str, Any] = field(default_factory=dict)  # env snapshot at failure
 
     @classmethod
     def create(

@@ -27,6 +27,10 @@ class OllamaProvider(LLMProvider):
     """LLM provider backed by a local Ollama server.
 
     Uses Ollama's native /api/chat HTTP endpoint (OpenAI-compatible format).
+
+    The underlying httpx.AsyncClient is created lazily on first use and reused
+    across calls to avoid per-request TCP connection overhead.  Call
+    ``await provider.aclose()`` when done to cleanly release the connection pool.
     """
 
     def __init__(
@@ -40,6 +44,19 @@ class OllamaProvider(LLMProvider):
         self.default_model = default_model
         self._base_url = f"http://{host}:{port}"
         self._timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+
+    def _get_client(self) -> httpx.AsyncClient:
+        """Return the shared httpx client, creating it on first call."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self._timeout)
+        return self._client
+
+    async def aclose(self) -> None:
+        """Close the underlying httpx connection pool."""
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
 
     async def chat(
         self,
@@ -72,10 +89,10 @@ class OllamaProvider(LLMProvider):
         url = f"{self._base_url}/api/chat"
 
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.post(url, json=payload)
-                resp.raise_for_status()
-                data = resp.json()
+            client = self._get_client()
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
         except httpx.HTTPStatusError as e:
             return LLMResponse(
                 content=f"Error calling Ollama: HTTP {e.response.status_code} — {e.response.text}",
@@ -90,7 +107,8 @@ class OllamaProvider(LLMProvider):
         """Parse Ollama /api/chat response."""
         message = data.get("message", {})
         content: str | None = message.get("content") or None
-        done_reason = data.get("done_reason", "stop")
+        # data.get("done_reason") may return None even when key exists; fallback to "stop"
+        done_reason: str = data.get("done_reason") or "stop"
 
         tool_calls: list[ToolCallRequest] = []
         for tc in message.get("tool_calls") or []:

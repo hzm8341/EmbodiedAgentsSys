@@ -109,6 +109,11 @@ class SubtaskMonitor:
         import time
         start_time = time.monotonic()
 
+        # Reset stall-detection state at the start of each subtask so that
+        # previous subtask positions do not pollute the stall baseline.
+        self._last_position = None
+        self._stall_start = None
+
         skill_task = asyncio.ensure_future(skill_execution_coro)
         monitor_task = asyncio.ensure_future(
             self._monitor_loop(skill_task, subtask_description, start_time)

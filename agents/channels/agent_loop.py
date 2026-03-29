@@ -72,7 +72,6 @@ class RobotAgentLoop:
 
         self._planner = CoTTaskPlanner(provider=provider)
         self._running = False
-        self._current_task_id: str | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -106,33 +105,35 @@ class RobotAgentLoop:
     # ------------------------------------------------------------------
 
     async def _handle_message(self, msg: InboundMessage) -> None:
-        """Process a single inbound task command."""
+        """Process a single inbound task command.
+
+        Each invocation uses a local task_id to avoid concurrency races when
+        multiple messages are processed simultaneously via asyncio.create_task.
+        """
         task_description = msg.content.strip()
         if not task_description:
             return
 
-        self._current_task_id = msg.task_id or msg.session_key
-        logger.info(
-            "Task received [%s]: %s",
-            self._current_task_id, task_description[:80],
-        )
+        # Use local variable (not self._current_task_id) to avoid concurrent-task races
+        task_id = msg.task_id or msg.session_key
+        logger.info("Task received [%s]: %s", task_id, task_description[:80])
 
         # Acknowledge receipt
         await self.bus.publish_outbound(OutboundMessage(
             channel=msg.channel,
             chat_id=msg.chat_id,
             content=f"Starting task: {task_description}",
-            task_id=self._current_task_id,
+            task_id=task_id,
             status="in_progress",
         ))
 
         try:
-            result = await self._execute_task(msg, task_description)
+            result = await self._execute_task(msg, task_description, task_id)
             await self.bus.publish_outbound(OutboundMessage(
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=result,
-                task_id=self._current_task_id,
+                task_id=task_id,
                 status="complete",
             ))
         except Exception as e:
@@ -141,13 +142,16 @@ class RobotAgentLoop:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=f"Task failed with error: {e}",
-                task_id=self._current_task_id,
+                task_id=task_id,
                 status="error",
             ))
-        finally:
-            self._current_task_id = None
 
-    async def _execute_task(self, msg: InboundMessage, task_description: str) -> str:
+    async def _execute_task(
+        self,
+        msg: InboundMessage,
+        task_description: str,
+        task_id: str | None = None,
+    ) -> str:
         """Full task execution pipeline."""
         # Step 1: decompose task into subtasks
         available_tools = self.tool_registry.list_tools()
@@ -176,25 +180,37 @@ class RobotAgentLoop:
             available_tools=available_tools,
         )
 
-        # Step 3: execute subtasks via CoT loop
+        # Step 3: execute subtasks via CoT loop, respecting DAG dependencies.
+        # Use get_current_subtask() to honour depends_on relationships — never
+        # iterate over subtasks directly, as later subtasks may depend on
+        # earlier ones completing successfully.
         completed = 0
-        for subtask in memory.task_graph.subtasks:
-            success = await self._execute_subtask(memory, subtask.id)
+        current = memory.task_graph.get_current_subtask()
+        while current is not None:
+            success = await self._execute_subtask(memory, current.id)
             if success:
                 completed += 1
             else:
-                # Failed subtask — log and continue (process supervisor may retry)
+                # Log the failure
                 if self.failure_log:
                     record = FailureRecord.create(
                         task_description=task_description,
-                        subtask_id=subtask.id,
-                        subtask_description=subtask.description,
+                        subtask_id=current.id,
+                        subtask_description=current.description,
                         error_type="subtask_failure",
-                        error_detail=subtask.failure_reason or "unknown",
-                        skill_id=subtask.skill_id,
+                        error_detail=current.failure_reason or "unknown",
+                        skill_id=current.skill_id,
                         robot_type=self.robot_type,
                     )
                     await self.failure_log.append(record)
+                # Stop on failure — dependent subtasks cannot run without this one
+                logger.warning(
+                    "Subtask [%s] failed, stopping task execution (dependencies may be unsatisfied)",
+                    current.id,
+                )
+                break
+            # Fetch next subtask (takes into account newly COMPLETED status)
+            current = memory.task_graph.get_current_subtask()
 
         total = len(memory.task_graph.subtasks)
         summary = memory.task_graph.progress_summary()

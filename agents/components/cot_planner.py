@@ -231,13 +231,25 @@ class CoTTaskPlanner:
         if name_match:
             action_name = name_match.group(1).strip()
 
-        # Extract action args (JSON object)
+        # Extract action args — find "Action args:" then grab the JSON object that follows.
+        # Use a brace-counting approach so nested objects are matched correctly.
         action_args: dict[str, Any] = {}
-        args_match = re.search(r"Action args:\s*(\{[^}]*\}|\{\})", text, re.DOTALL)
-        if args_match:
+        args_prefix_match = re.search(r"Action args:\s*(\{)", text)
+        if args_prefix_match:
+            start = args_prefix_match.start(1)
+            depth = 0
+            end = start
+            for i, ch in enumerate(text[start:], start=start):
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        break
             try:
-                action_args = json.loads(args_match.group(1))
-            except json.JSONDecodeError:
+                action_args = json.loads(text[start:end])
+            except (json.JSONDecodeError, ValueError):
                 pass
 
         # Handle SATISFIED → complete action

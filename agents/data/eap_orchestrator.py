@@ -153,7 +153,10 @@ class EAPOrchestrator:
                 stats.total_steps_collected += traj.reverse.num_steps
 
             # --- Record completed trajectory or count failure ---
-            if forward_ok:
+            # A cycle is considered failed if either forward OR reverse fails,
+            # because a failed reverse means the environment was not reset and
+            # subsequent cycles will operate on a corrupted state.
+            if forward_ok and reverse_ok:
                 failed_cycles = 0
                 collected.append(traj)
                 if self._on_trajectory_complete:
@@ -161,9 +164,15 @@ class EAPOrchestrator:
                         await self._on_trajectory_complete(traj)
                     except Exception as e:
                         logger.warning("on_trajectory_complete callback error: %s", e)
-
-            if not forward_ok:
+            else:
                 failed_cycles += 1
+                if not forward_ok:
+                    logger.info("EAP cycle %d: forward failed", cycle_id)
+                if not reverse_ok:
+                    logger.warning(
+                        "EAP cycle %d: reverse (reset) failed — environment may be in invalid state",
+                        cycle_id,
+                    )
                 if failed_cycles >= self.config.max_failed_cycles:
                     logger.warning(
                         "EAP stopping: %d consecutive failed cycles (max=%d)",
@@ -202,6 +211,9 @@ class EAPOrchestrator:
         trajectory.phase = phase
         trajectory.skill_id = skill_id
 
+        best_observations: list[dict[str, Any]] = []
+        best_actions: list[dict[str, Any]] = []
+
         for attempt in range(1, max_retries + 1):
             logger.debug(
                 "EAP %s attempt %d/%d: %s",
@@ -215,18 +227,27 @@ class EAPOrchestrator:
                 logger.warning("Skill runner error (%s): %s", skill_id, e)
                 success, observations, actions = False, [], []
 
-            for obs, act in zip(observations, actions):
-                trajectory.add_step(obs, act)
-
             if success:
+                # Use only the successful attempt's data — discard previous attempts
+                for obs, act in zip(observations, actions):
+                    trajectory.add_step(obs, act)
                 trajectory.finalize(success=True)
                 return True
+
+            # Keep the longest failed attempt for potential analysis; discard on next retry
+            if len(observations) > len(best_observations):
+                best_observations = observations
+                best_actions = actions
 
             if attempt < max_retries:
                 logger.info(
                     "EAP %s failed (attempt %d/%d), retrying...",
                     phase.value, attempt, max_retries,
                 )
+
+        # All retries exhausted — store the best (longest) failed attempt for diagnostics
+        for obs, act in zip(best_observations, best_actions):
+            trajectory.add_step(obs, act)
 
         # All retries exhausted — call human
         trajectory.finalize(success=False)

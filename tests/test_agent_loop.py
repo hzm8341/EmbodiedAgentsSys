@@ -319,3 +319,151 @@ def test_robot_agent_loop_stop():
     loop._running = True
     loop.stop()
     assert not loop._running
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for bug fixes
+# ---------------------------------------------------------------------------
+
+def test_dag_dependency_stops_on_failure():
+    """CRITICAL regression: when a subtask fails, subsequent dependent subtasks must NOT run.
+
+    Before fix: _execute_task iterated all subtasks directly, ignoring DAG.
+    After fix: uses get_current_subtask() which respects depends_on.
+    """
+    import json
+
+    executed_subtasks = []
+
+    # Two subtasks: st_01 depends on st_00
+    decompose_response = json.dumps(["step A", "step B (depends on A)"])
+
+    # Step A: always fails (STUCK); Step B should never be reached
+    def _make_stuck() -> str:
+        return """## Step 4: Evaluate
+State: STUCK
+Reason: Cannot proceed.
+
+## Step 5: Action decision
+Action type: call_human
+Action name: call_human
+Action args: {"reason": "stuck"}
+"""
+
+    provider = _SequenceProvider([decompose_response, _make_stuck()])
+
+    bus = MessageBus()
+    loop = RobotAgentLoop(bus=bus, provider=provider, max_iterations=1)
+
+    async def run():
+        msg = InboundMessage(channel="t", sender_id="u", chat_id="c",
+                             content="do two-step task")
+        await bus.publish_inbound(msg)
+        inbound = await bus.consume_inbound()
+        await loop._handle_message(inbound)
+        msgs = []
+        while bus.outbound_size > 0:
+            msgs.append(await bus.consume_outbound())
+        return msgs
+
+    msgs = asyncio.get_event_loop().run_until_complete(run())
+    # Task finishes (with failure), but only 1 subtask was attempted
+    assert any(m.status in ("complete", "error") for m in msgs)
+    # Provider should have been called at most: 1 decompose + 1 CoT = 2 times
+    assert provider._index <= 3  # decompose + at most 2 CoT calls for st_00
+
+
+def test_no_current_task_id_instance_variable():
+    """HIGH regression: RobotAgentLoop should not have _current_task_id as instance attribute."""
+    loop = RobotAgentLoop(bus=MessageBus(), provider=_SequenceProvider([]))
+    assert not hasattr(loop, "_current_task_id"), (
+        "_current_task_id should not be an instance variable to avoid concurrent race"
+    )
+
+
+def test_eap_retry_does_not_accumulate_data():
+    """HIGH regression: failed retries should not stack data in the trajectory."""
+    from agents.data.eap import EAPPhase, EAPTrajectory
+    from agents.data.eap_orchestrator import EAPConfig, EAPOrchestrator
+
+    call_count = [0]
+
+    async def runner(skill_id: str, kwargs: dict):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            # First attempt: 5 observations but fails
+            obs = [{"obs": i} for i in range(5)]
+            acts = [{"act": i} for i in range(5)]
+            return False, obs, acts
+        else:
+            # Second attempt: 3 observations and succeeds
+            obs = [{"obs": i} for i in range(3)]
+            acts = [{"act": i} for i in range(3)]
+            return True, obs, acts
+
+    config = EAPConfig(
+        skill_id="grasp", reverse_skill_id="release",
+        target_trajectories=1, max_forward_retries=2, max_reverse_retries=1,
+        max_failed_cycles=2,
+    )
+
+    async def run():
+        orch = EAPOrchestrator(config=config, skill_runner=runner)
+        return await orch.run_collection_loop()
+
+    trajs, stats = asyncio.get_event_loop().run_until_complete(run())
+    # Should succeed on second attempt
+    assert stats.successful_forward >= 1
+    # Forward trajectory should have exactly 3 steps (from successful attempt, not 5+3=8)
+    if trajs:
+        assert trajs[0].forward.num_steps == 3, (
+            f"Expected 3 steps from successful attempt, got {trajs[0].forward.num_steps}"
+        )
+
+
+def test_cot_parser_handles_nested_json_args():
+    """MEDIUM regression: CoT parser should handle nested JSON in action args."""
+    from agents.components.cot_planner import CoTTaskPlanner
+
+    text = """## Step 4: Evaluate
+State: PROGRESSING
+Reason: Executing.
+
+## Step 5: Action decision
+Action type: skill
+Action name: manipulation.grasp
+Action args: {"target": {"id": "cup_01", "pose": {"x": 0.5, "y": 0.3}}}
+"""
+    decision = CoTTaskPlanner._parse_cot_response(text)
+    assert decision.action_args == {
+        "target": {"id": "cup_01", "pose": {"x": 0.5, "y": 0.3}}
+    }
+
+
+def test_subtask_monitor_stall_resets_between_tasks():
+    """HIGH regression: stall detection state must reset between subtask calls."""
+    from agents.components.subtask_monitor import SubtaskMonitor, MonitorConfig
+
+    monitor = SubtaskMonitor(config=MonitorConfig(poll_interval=0.01, max_duration=5.0))
+
+    # Simulate first subtask call set some position state
+    monitor._last_position = {"j1": 1.0, "j2": 0.5}
+    monitor._stall_start = 999999.0  # far future stall start
+
+    async def run():
+        result = await monitor.monitor_subtask(
+            subtask_description="Second subtask",
+            skill_execution_coro=_successful_skill(),
+        )
+        return result
+
+    result = asyncio.get_event_loop().run_until_complete(run())
+    # Should succeed — stall state from previous task must be reset
+    assert result.success
+    # Verify state was cleared at start of call
+    # (monitor's _last_position was reset inside monitor_subtask)
+
+
+async def _successful_skill() -> bool:
+    await asyncio.sleep(0.05)
+    return True

@@ -5,7 +5,7 @@ Extended with robot-specific fields (task_id, priority).
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -17,7 +17,7 @@ class InboundMessage:
     sender_id: str        # user/system identifier
     chat_id: str          # conversation/session identifier
     content: str          # command text or serialized action
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     media: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     session_key_override: str | None = None
