@@ -1,0 +1,29 @@
+task_id: "pick_place_basic_001"
+description: "抓取红色方块并放置到B区"
+robot_type: "arm"
+tags: ["basic", "manipulation"]
+scene:
+  objects:
+    - id: "red_cube"
+      type: "cube"
+      color: "red"
+      initial_position: [0.3, -0.1, 0.05]
+    - id: "zone_b"
+      type: "target_zone"
+      color: ""
+      initial_position: [0.5, 0.2, 0.0]
+expected_skills:
+  - "manipulation.reach"
+  - "manipulation.grasp"
+  - "manipulation.place"
+success_criteria:
+  result:
+    type: "position_match"
+    object: "red_cube"
+    target: "zone_b"
+    tolerance: 0.02
+  efficiency:
+    max_duration_seconds: 30
+  robustness:
+    max_retry_count: 2
+    allowed_failures: ["gripper_slope"]

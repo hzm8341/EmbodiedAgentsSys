@@ -1,0 +1,22 @@
+task_id: "inspect_task_001"
+description: "检测工作台上的物体"
+robot_type: "arm"
+tags: ["vision", "inspection"]
+scene:
+  objects:
+    - id: "target_object"
+      type: "unknown"
+      color: ""
+      initial_position: [0.3, 0.0, 0.1]
+expected_skills:
+  - "manipulation.reach"
+  - "vision.inspect"
+success_criteria:
+  result:
+    type: "object_detected"
+    object: "target_object"
+  efficiency:
+    max_duration_seconds: 20
+  robustness:
+    max_retry_count: 1
+    allowed_failures: []
