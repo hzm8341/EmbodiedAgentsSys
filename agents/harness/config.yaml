@@ -1,0 +1,30 @@
+harness:
+  mode: "hardware_mock"
+  robot_type: "arm"
+  auto_attach: false
+  tracing_enabled: true
+  trace_dir: "agents/harness/traces"
+  auto_append_regression: true
+  pass_threshold: 0.70
+  task_timeout: 60
+
+skill_mock:
+  default_success_rate: 0.85
+  latency_ms: 50
+  per_skill_rate:
+    manipulation.grasp: 0.80
+    manipulation.place: 0.90
+    manipulation.reach: 0.95
+
+hardware_mock:
+  default_success_rate: 0.85
+  latency_ms: 50
+  joint_error_rate: 0.05
+  gripper_slope_rate: 0.10
+  position_noise: 0.005
+
+full_mock:
+  default_success_rate: 0.85
+  latency_ms: 50
+  vla_success_rate: 0.75
+  vla_action_noise: true
