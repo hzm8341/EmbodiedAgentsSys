@@ -267,6 +267,11 @@ class VLAConfig(ModelComponentConfig):
 
     joint_names_map: Dict[str, str] = field()
     camera_inputs_map: Mapping[str, Union[Topic, Dict]] = field()
+    # Default image shape (height, width, channels) used when auto-generating
+    # observation spec from joint_names_map and camera_inputs_map.
+    image_shape: tuple = field(default=(480, 640, 3))
+    # Prefix used for observation keys in the auto-generated spec.
+    observation_prefix: str = field(default="observation")
     # TODO: One can make models that take multiple state input types.
     # This parameter would have to be revised in that case
     state_input_type: Literal["positions", "velocities", "accelerations", "efforts"] = (

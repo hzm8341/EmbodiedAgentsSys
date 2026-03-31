@@ -39,11 +39,20 @@ class LeRobotClient(ModelClient):
             self.channel = insecure_channel(f"{host}:{port}")
             self.stub = self.services_pb2_grpc.AsyncInferenceStub(self.channel)
 
-            # TODO: Remove torch depenedency here once server can send numpy arrays
-            from torch import load, storage
-
-            self.torch_load = load
-            self.torch_storage = storage
+            # torch is optional: only needed when server sends torch tensors
+            # The server currently sends torch tensors, so we need torch for deserialization.
+            # This dependency will be removed once the server supports numpy arrays directly.
+            self.torch_load = None
+            self.torch_storage = None
+            try:
+                from torch import load, storage
+                self.torch_load = load
+                self.torch_storage = storage
+            except ImportError:
+                self.logger.warning(
+                    "torch not installed. LeRobotClient requires torch for tensor deserialization. "
+                    "Install with: pip install torch --index-url https://download.pytorch.org/whl/cpu"
+                )
 
         except ModuleNotFoundError as e:
             raise ModuleNotFoundError(
@@ -196,39 +205,43 @@ class LeRobotClient(ModelClient):
     def receive_actions(self):
         """Receive actions from the server"""
 
-        # HACK: Patch function: Load from bytes to cpu
-        def safe_cpu_load_from_bytes(b):
-            return self.torch_load(BytesIO(b), map_location="cpu")
-
         try:
             # Retrieve bytes
             actions_response = self.stub.GetActions(self.services_pb2.Empty())
             if not actions_response.data:
                 return
 
-            # HACK: Monkey patch torch.storge._load_from_bytes as pickle.dumps
-            # on server side expects it. And torch will expect server's device
-            # device to be present locally. We replace it with our own function
+            # Check if torch is available for deserialization
+            if self.torch_load is not None and self.torch_storage is not None:
+                # HACK: Patch function: Load from bytes to cpu
+                def safe_cpu_load_from_bytes(b):
+                    return self.torch_load(BytesIO(b), map_location="cpu")
 
-            # TODO: Remove torch dependency on the robot once policy server
-            # can send numpy arrays
+                # HACK: Monkey patch torch.storge._load_from_bytes as pickle.dumps
+                # on server side expects it. And torch will expect server's device
+                # device to be present locally. We replace it with our own function
 
-            # 1. Keep original function
-            original_load_from_bytes = self.torch_storage._load_from_bytes
+                # 1. Keep original function
+                original_load_from_bytes = self.torch_storage._load_from_bytes
 
-            try:
-                # 2. Apply the Patch
-                # Replace the internal function that pickle calls with our version
-                self.torch_storage._load_from_bytes = safe_cpu_load_from_bytes
+                try:
+                    # 2. Apply the Patch
+                    # Replace the internal function that pickle calls with our version
+                    self.torch_storage._load_from_bytes = safe_cpu_load_from_bytes
 
-                # 3. Deserialize
-                timed_actions = pickle.loads(actions_response.data)
+                    # 3. Deserialize
+                    timed_actions = pickle.loads(actions_response.data)
 
-            finally:
-                # 4. Restore original function
-                self.torch_storage._load_from_bytes = original_load_from_bytes
+                finally:
+                    # 4. Restore original function
+                    self.torch_storage._load_from_bytes = original_load_from_bytes
 
-            return timed_actions
+                return timed_actions
+            else:
+                # torch not available - server may be sending numpy arrays
+                # This path will be enabled once server supports numpy directly
+                self.logger.warning("Cannot deserialize actions: torch not available")
+                return None
 
         except Exception as e:
             print(f"Receiver Error: {e}")

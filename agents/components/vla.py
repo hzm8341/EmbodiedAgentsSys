@@ -103,11 +103,10 @@ class VLA(ModelComponent):
             )
 
         if self.config.warmup:
-            # TODO: warmup with lerobot client
-            self.get_logger().warning(
-                "Warmup cannot not be called with LeRobot client."
-            )
-            self.config.warmup = False
+            try:
+                self._warmup()
+            except Exception as e:
+                self.get_logger().warning(f"Warmup failed: {e}. Continuing without warmup.")
 
         # Activate component and initialize client
         super().custom_on_activate()
@@ -233,13 +232,12 @@ class VLA(ModelComponent):
         logger = get_logger(component_name)
 
         # Initialize dataset features if missing
-        # TODO: Make prefix and image shape config params
         if not self.model_client._model._features:
             self.model_client._model._features = create_observation_spec(
                 self.config.joint_names_map,
                 self.config.camera_inputs_map,
-                prefix="observation",
-                image_shape=(480, 640, 3),
+                prefix=getattr(self.config, "observation_prefix", "observation"),
+                image_shape=getattr(self.config, "image_shape", (480, 640, 3)),
             )
             logger.warning(
                 "You have not provided a dataset file for the model. Feature specification are required for initializing the policy on LeRobot Policy Server. We are going to auto-generate a feature spec from `joint_names_map` and `camera_inputs_map` that you provided. Please make sure their keys correspond to the names of features and actions used when training the model. Policy init might fail."
@@ -556,6 +554,7 @@ class VLA(ModelComponent):
                     raise TypeError(
                         f"Only numpy arrays of dtype {self._dataset_action_dtype} are acceptable as outputs of aggregator functions."
                     )
+                return out
 
             _wrapper.__name__ = func.__name__
             return _wrapper
@@ -725,5 +724,31 @@ class VLA(ModelComponent):
 
     def _warmup(self):
         """Warm up and stat check"""
-        # TODO: implement warmup
-        pass
+        logger = self.get_logger()
+        logger.info("Starting VLA warmup...")
+        try:
+            # Build a dummy observation matching expected input shapes
+            dummy_state = {k: np.zeros(len(v)) for k, v in self.config.joint_names_map.items()}
+            dummy_images = {}
+            for cam_key, cam_val in self.config.camera_inputs_map.items():
+                dummy_images[cam_key] = np.zeros(
+                    getattr(self.config, "image_shape", (480, 640, 3)),
+                    dtype=np.uint8
+                )
+            warmup_input = {
+                "timestamp": time.time(),
+                "timestep": -1,
+                **dummy_state,
+                **dummy_images,
+                "task": "warmup",
+            }
+            self.model_client.inference(warmup_input)
+            # Allow action buffer to fill
+            for _ in range(5):
+                actions = self.model_client.receive_actions()
+                if actions:
+                    break
+                time.sleep(0.05)
+            logger.info("VLA warmup completed successfully.")
+        except Exception as e:
+            logger.warning(f"VLA warmup failed: {e}. Proceeding without warmup.")
