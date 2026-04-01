@@ -1,4 +1,14 @@
-"""Agent Harness — Testing, Simulation, and Monitoring Framework."""
+"""Agent Harness — Testing, Simulation, and Monitoring Framework.
+
+Quick start::
+
+    from agents.harness import HarnessRunner, HarnessConfig, TaskSet
+    from agents.harness.core.mode import HarnessMode
+
+    config = HarnessConfig(mode=HarnessMode.SKILL_MOCK)
+    runner = HarnessRunner(config)
+    reports = runner.evaluate(task_set)
+"""
 from agents.harness.core.mode import HarnessMode
 from agents.harness.core.config import HarnessConfig
 from agents.harness.core.task_set import Task, TaskSet

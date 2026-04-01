@@ -30,7 +30,11 @@ class HarnessScorer:
     def score(self, evaluation_scores: list[EvaluationScore],
               task_id: str = "") -> ScoreReport:
         active = [s for s in evaluation_scores if s.weight > 0]
-        total = sum(s.score for s in active) / len(active) if active else 0.0
+        total_weight = sum(s.weight for s in active)
+        total = (
+            sum(s.score * s.weight for s in active) / total_weight
+            if total_weight > 0 else 0.0
+        )
 
         return ScoreReport(
             task_id=task_id,

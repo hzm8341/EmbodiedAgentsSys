@@ -1,8 +1,11 @@
 from __future__ import annotations
 import json
+import logging
 import yaml
 from pathlib import Path
 from agents.harness.core.task_set import Task, TaskSet
+
+logger = logging.getLogger(__name__)
 
 
 class TaskLoader:
@@ -14,7 +17,8 @@ class TaskLoader:
                 data = yaml.safe_load(yaml_file.read_text())
                 if data and "task_id" in data:
                     ts.declarative.append(Task.from_dict(data))
-            except Exception:
+            except Exception as exc:
+                logger.warning("Skipping %s: %s", yaml_file, exc)
                 continue
         return ts
 
@@ -40,6 +44,7 @@ class TaskLoader:
                     tags=["regression", rec.get("error_type", "unknown")],
                 )
                 ts.regression.append(task)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Skipping failure log line: %s", exc)
                 continue
         return ts

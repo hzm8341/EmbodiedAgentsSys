@@ -25,16 +25,18 @@ def test_runner_creates_with_config():
 
 def test_runner_evaluate_returns_reports():
     config = HarnessConfig(mode=HarnessMode.SKILL_MOCK)
+    config.skill_mock.default_success_rate = 1.0  # deterministic: all skills succeed
     runner = HarnessRunner(config)
     ts = _make_simple_task_set()
     reports = runner.evaluate(ts)
     assert len(reports) == 1
     assert reports[0].task_id == "run_test_001"
-    assert 0.0 <= reports[0].total_score <= 1.0
+    assert reports[0].total_score > 0.0
 
 
 def test_runner_summary_str():
     config = HarnessConfig(mode=HarnessMode.SKILL_MOCK)
+    config.skill_mock.default_success_rate = 1.0
     runner = HarnessRunner(config)
     ts = _make_simple_task_set()
     reports = runner.evaluate(ts)
