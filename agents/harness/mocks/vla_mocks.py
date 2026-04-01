@@ -1,5 +1,8 @@
 from __future__ import annotations
 import random
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MockVLAAdapter:
@@ -17,4 +20,7 @@ class MockVLAAdapter:
         return base
 
     async def execute(self, action: list[float]) -> dict:
-        return {"success": random.random() < self.success_rate, "action": action}
+        success = random.random() < self.success_rate
+        if not success:
+            logger.warning(f"MockVLAAdapter: action execution failed (success_rate={self.success_rate})")
+        return {"success": success, "action": action}
