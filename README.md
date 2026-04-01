@@ -804,6 +804,28 @@ await bus.publish(Event(
 
 ---
 
+## Models
+
+Some models are not included in the repository due to size constraints. Download them separately:
+
+### Qwen3.5 Claude Distilled (GGUF)
+
+```bash
+# Option 1: Download from Hugging Face
+# Visit: https://huggingface.co/<model-path>
+# Download qwen3.5-9b-claude-distilled-v2-gguf/
+
+# Option 2: Using huggingface-cli
+huggingface-cli download <model-path> --local models/qwen3.5-9b-claude-distilled-v2-gguf
+
+# Option 3: Manual download
+# Place downloaded files into: models/qwen3.5-9b-claude-distilled-v2-gguf/
+```
+
+**Note:** The `models/` directory is in `.gitignore` and should not be committed to git.
+
+---
+
 ## Configuration Files
 
 ### VLA Configuration (config/vla_config.yaml)
