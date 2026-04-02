@@ -7,6 +7,7 @@ Aligned with Claude Code utils/errors.ts:
   - TelemetrySafeError for errors safe to log without scrubbing
   - Utility functions: is_abort_error, classify_error, short_error_stack
 """
+
 from __future__ import annotations
 
 import asyncio
