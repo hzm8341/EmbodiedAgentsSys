@@ -92,3 +92,93 @@ class TestTruncateEntrypoint:
         result = truncate_entrypoint(raw)
         assert "truncated" in result
         assert result.count("\n") < 250
+
+
+import asyncio
+from unittest.mock import AsyncMock, MagicMock
+
+
+class TestFindRelevantMemories:
+    def test_returns_empty_if_no_files(self, tmp_path):
+        from agents.memory.longterm.retrieval import find_relevant_memories
+        from agents.memory.longterm.store import MemoryStore
+        store = MemoryStore(tmp_path)
+        mock_provider = MagicMock()
+        result = asyncio.run(find_relevant_memories("grasp task", store, mock_provider))
+        assert result == []
+
+    def test_calls_llm_and_returns_relevant(self, tmp_path):
+        from agents.memory.longterm.retrieval import find_relevant_memories
+        from agents.memory.longterm.store import MemoryStore
+        from agents.memory.longterm.types import MemoryType
+        store = MemoryStore(tmp_path)
+        store.save("vla-fail", MemoryType.FEEDBACK, "VLA failure", "Use force control.")
+        store.save("ros-ref", MemoryType.REFERENCE, "ROS topics", "Topics list here.")
+        mock_provider = MagicMock()
+        mock_provider.chat = AsyncMock(return_value=MagicMock(
+            content='["feedback_vla-fail.md"]'
+        ))
+        results = asyncio.run(find_relevant_memories("grasp task", store, mock_provider))
+        assert len(results) == 1
+        assert "force control" in results[0].content
+
+    def test_already_surfaced_are_excluded(self, tmp_path):
+        from agents.memory.longterm.retrieval import find_relevant_memories
+        from agents.memory.longterm.store import MemoryStore
+        from agents.memory.longterm.types import MemoryType
+        store = MemoryStore(tmp_path)
+        store.save("mem-a", MemoryType.FEEDBACK, "desc a", "body a")
+        mock_provider = MagicMock()
+        mock_provider.chat = AsyncMock(return_value=MagicMock(content='[]'))
+        results = asyncio.run(find_relevant_memories(
+            "query", store, mock_provider,
+            already_surfaced={"feedback_mem-a.md"}
+        ))
+        assert results == []
+
+
+class TestLongTermMemoryManager:
+    def test_remember_and_recall(self, tmp_path):
+        from agents.memory.longterm.manager import LongTermMemoryManager
+        from agents.memory.longterm.types import MemoryType
+        mock_provider = MagicMock()
+        mock_provider.chat = AsyncMock(return_value=MagicMock(
+            content='["feedback_vla-grasp.md"]'
+        ))
+        mgr = LongTermMemoryManager(
+            global_dir=tmp_path / "global",
+            project_dir=tmp_path / "project",
+            provider=mock_provider,
+        )
+        mgr.remember("vla-grasp", MemoryType.FEEDBACK, "VLA grasp issue", "body", scope="project")
+        results = asyncio.run(mgr.recall("grasp task"))
+        assert any("body" in r for r in results)
+
+    def test_forget_removes_memory(self, tmp_path):
+        from agents.memory.longterm.manager import LongTermMemoryManager
+        from agents.memory.longterm.store import MemoryStore
+        from agents.memory.longterm.types import MemoryType
+        mock_provider = MagicMock()
+        mgr = LongTermMemoryManager(
+            global_dir=tmp_path / "global",
+            project_dir=tmp_path / "project",
+            provider=mock_provider,
+        )
+        mgr.remember("temp", MemoryType.MISSION, "temp mission", "body", scope="project")
+        mgr.forget("temp", scope="project")
+        assert MemoryStore(tmp_path / "project").load("temp") is None
+
+    def test_get_index_both(self, tmp_path):
+        from agents.memory.longterm.manager import LongTermMemoryManager
+        from agents.memory.longterm.types import MemoryType
+        mock_provider = MagicMock()
+        mgr = LongTermMemoryManager(
+            global_dir=tmp_path / "global",
+            project_dir=tmp_path / "project",
+            provider=mock_provider,
+        )
+        mgr.remember("global-ref", MemoryType.REFERENCE, "global", "body", scope="global")
+        mgr.remember("proj-ref", MemoryType.REFERENCE, "project", "body", scope="project")
+        index = mgr.get_index("both")
+        assert "global-ref" in index
+        assert "proj-ref" in index
