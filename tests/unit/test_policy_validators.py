@@ -198,3 +198,70 @@ class TestWhitelistValidator:
         )
         result = await v.validate_action(action)
         assert result.valid is False
+
+
+class TestBoundaryChecker:
+    """Test suite for BoundaryChecker validator."""
+
+    @pytest.mark.asyncio
+    async def test_accept_pose_in_workspace(self, move_proposal):
+        """Test that pose within workspace boundaries is accepted."""
+        from agents.policy.validators.boundary import BoundaryChecker
+
+        checker = BoundaryChecker()
+        for action in move_proposal.action_sequence:
+            result = await checker.validate_action(action)
+        assert result.valid
+
+    @pytest.mark.asyncio
+    async def test_reject_pose_out_of_workspace(self):
+        """Test that pose outside workspace boundaries is rejected."""
+        from agents.policy.validators.boundary import BoundaryChecker
+
+        checker = BoundaryChecker()
+        action = Action(
+            action_type=ActionType.MOVE_TO,
+            params={"target_pose": [10.0, 10.0, 10.0], "speed": 0.5},
+            expected_outcome=ExpectedOutcomeType.ARM_REACHES_TARGET,
+        )
+        result = await checker.validate_action(action)
+        assert result.valid is False
+        assert "workspace" in result.reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_accept_gripper_force_in_limit(self, gripper_proposal):
+        """Test that gripper force within limits is accepted."""
+        from agents.policy.validators.boundary import BoundaryChecker
+
+        checker = BoundaryChecker()
+        for action in gripper_proposal.action_sequence:
+            result = await checker.validate_action(action)
+        assert result.valid
+
+    @pytest.mark.asyncio
+    async def test_reject_gripper_force_over_limit(self):
+        """Test that gripper force exceeding limit is rejected."""
+        from agents.policy.validators.boundary import BoundaryChecker
+
+        checker = BoundaryChecker()
+        action = Action(
+            action_type=ActionType.GRIPPER_CLOSE,
+            params={"force": 150},
+            expected_outcome=ExpectedOutcomeType.OBJECT_GRASPED,
+        )
+        result = await checker.validate_action(action)
+        assert result.valid is False
+
+    @pytest.mark.asyncio
+    async def test_skip_non_movement_actions(self):
+        """Test that non-movement actions are skipped and pass validation."""
+        from agents.policy.validators.boundary import BoundaryChecker
+
+        checker = BoundaryChecker()
+        action = Action(
+            action_type=ActionType.VISION_CAPTURE,
+            params={},
+            expected_outcome=ExpectedOutcomeType.OBJECT_VISIBLE,
+        )
+        result = await checker.validate_action(action)
+        assert result.valid
