@@ -52,6 +52,24 @@ class TelemetrySafeError(AgentError):
     """Error whose message is safe to log to telemetry without scrubbing."""
 
 
+class ValidationError(AgentError):
+    """Action proposal failed policy validation."""
+
+    def __init__(self, message: str, validator: str = "", action_type: str = "") -> None:
+        super().__init__(message)
+        self.validator = validator
+        self.action_type = action_type
+
+
+class ExecutionConfirmationError(AgentError):
+    """Execution result did not match expected outcome."""
+
+    def __init__(self, message: str, expected_outcome: str = "", status: str = "") -> None:
+        super().__init__(message)
+        self.expected_outcome = expected_outcome
+        self.status = status
+
+
 class ErrorKind(str, Enum):
     ABORT = "abort"
     VLA_ACTION = "vla_action"
