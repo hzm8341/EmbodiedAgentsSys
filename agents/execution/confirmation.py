@@ -62,10 +62,11 @@ class ExecutionConfirmationEngine:
         # Check timeout
         if feedbacks and len(feedbacks) >= 2:
             duration = feedbacks[-1].timestamp - feedbacks[0].timestamp
-            if duration > timeout_seconds:
+            duration_seconds = duration.total_seconds()
+            if duration_seconds > timeout_seconds:
                 return ConfirmationResult(
                     status="timeout",
-                    reason=f"execution took {duration:.1f}s > {timeout_seconds}s",
+                    reason=f"execution took {duration_seconds:.1f}s > {timeout_seconds}s",
                 )
 
         # Check based on expected outcome type
