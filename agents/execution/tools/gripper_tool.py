@@ -19,6 +19,7 @@ class GripperTool(ToolBase):
 
     def __init__(self):
         """初始化机械爪工具"""
+        super().__init__()
         self.current_position = 0.0  # 0.0 = closed, 1.0 = open
         self.max_force = 1.0
         self.min_force = 0.0
