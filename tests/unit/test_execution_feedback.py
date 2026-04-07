@@ -72,6 +72,8 @@ class TestExecutionFeedbackToDict:
             "error_message",
             "error_type",
             "timestamp",
+            "is_terminal",
+            "is_recoverable",
         }
         assert set(result.keys()) == expected_keys
 
@@ -84,3 +86,43 @@ class TestExecutionFeedbackToDict:
         assert result["error_message"] == ""
         assert result["error_type"] == ""
         assert isinstance(result["timestamp"], str)
+        assert result["is_terminal"] is False
+        assert result["is_recoverable"] is False
+
+
+class TestGripperToolNewInterface:
+    """Tests for GripperTool.execute_with_feedback method."""
+
+    @pytest.mark.asyncio
+    async def test_yields_start_and_completed(self) -> None:
+        """Test that execute_with_feedback yields STARTED and COMPLETED stages."""
+        from agents.execution.tools.gripper_tool import GripperTool
+
+        tool = GripperTool()
+        feedbacks = []
+        async for fb in tool.execute_with_feedback(
+            {"action": "close", "force": 0.5}, {}
+        ):
+            feedbacks.append(fb)
+
+        assert len(feedbacks) >= 2
+        assert feedbacks[0].stage == FeedbackStage.STARTED
+        assert feedbacks[-1].stage == FeedbackStage.COMPLETED
+        assert feedbacks[-1].is_terminal
+
+    @pytest.mark.asyncio
+    async def test_cancel_stops_execution(self) -> None:
+        """Test that cancel() causes execution to fail gracefully."""
+        from agents.execution.tools.gripper_tool import GripperTool
+
+        tool = GripperTool()
+        tool.cancel()
+        feedbacks = []
+        async for fb in tool.execute_with_feedback(
+            {"action": "close", "force": 0.5}, {}
+        ):
+            feedbacks.append(fb)
+
+        assert len(feedbacks) >= 1
+        assert any(fb.stage == FeedbackStage.FAILED for fb in feedbacks)
+        assert any(fb.has_error is True for fb in feedbacks)

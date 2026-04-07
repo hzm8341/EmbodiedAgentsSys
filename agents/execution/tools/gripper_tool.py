@@ -93,3 +93,62 @@ class GripperTool(ToolBase):
         """清理资源"""
         # 打开机械爪以释放任何被抓取的物体
         await self.execute(action="open")
+
+    async def execute_with_feedback(
+        self,
+        params: dict,
+        current_state: dict,
+    ):
+        """
+        新接口：异步生成器，执行过程中产生反馈
+
+        Args:
+            params: 工具参数，包含 action 和 force
+            current_state: 当前状态字典
+
+        Yields:
+            ExecutionFeedback: 执行过程中的反馈事件
+        """
+        from agents.execution.execution_feedback import ExecutionFeedback, FeedbackStage
+
+        # 检查取消标志
+        if self.is_cancelled():
+            yield ExecutionFeedback(
+                stage=FeedbackStage.FAILED,
+                progress=0.0,
+                current_state=current_state,
+                has_error=True,
+                error_message="cancelled before start",
+                error_type="user_cancel",
+            )
+            return
+
+        action = params.get("action", "close")
+        force = params.get("force", 1.0)
+
+        # 产生 STARTED 反馈
+        yield ExecutionFeedback(
+            stage=FeedbackStage.STARTED,
+            progress=0.0,
+            current_state=current_state,
+            message=f"gripper {action} started (force={force})",
+        )
+
+        try:
+            # 执行动作
+            result = await self.execute(action=action, force=force)
+            yield ExecutionFeedback(
+                stage=FeedbackStage.COMPLETED,
+                progress=1.0,
+                current_state={**current_state, "gripper_result": result},
+                message=f"gripper {action} completed",
+            )
+        except Exception as exc:
+            yield ExecutionFeedback(
+                stage=FeedbackStage.FAILED,
+                progress=0.0,
+                current_state=current_state,
+                has_error=True,
+                error_message=str(exc),
+                error_type="hardware",
+            )
