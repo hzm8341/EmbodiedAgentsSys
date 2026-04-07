@@ -84,11 +84,14 @@ class WhitelistValidator(Validator):
             validator="WhitelistValidator",
         )
 
-    async def validate_action(self, action: Action) -> ValidationResult:
+    async def validate_action(
+        self, action: Action, robot_state: Optional[Dict[str, Any]] = None
+    ) -> ValidationResult:
         """Validate a complete action including type and parameters.
 
         Args:
             action: The Action object to validate.
+            robot_state: Optional robot state dictionary (unused by WhitelistValidator).
 
         Returns:
             ValidationResult with validation outcome and reason.

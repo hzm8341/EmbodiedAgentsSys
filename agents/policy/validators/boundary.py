@@ -63,11 +63,14 @@ class BoundaryChecker(Validator):
         """
         return 2
 
-    async def validate_action(self, action: Action) -> ValidationResult:
+    async def validate_action(
+        self, action: Action, robot_state: Optional[Dict[str, Any]] = None
+    ) -> ValidationResult:
         """Validate a single action against physical safety boundaries.
 
         Args:
             action: The Action object to validate.
+            robot_state: Optional robot state dictionary (unused by BoundaryChecker).
 
         Returns:
             ValidationResult with valid flag and reason.

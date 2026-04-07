@@ -1,0 +1,19 @@
+# config/approval_policy.yaml - Approval policy for high-risk actions
+
+approval_rules:
+  move_to:
+    required: true
+    reason: "Arm movement requires operator confirmation"
+    timeout_seconds: 30
+    on_timeout: auto_reject
+  emergency_stop:
+    required: true
+    reason: "Emergency stop requires confirmation"
+    timeout_seconds: 10
+    on_timeout: auto_reject
+
+# Actions that do NOT require approval (default)
+no_approval_required:
+  - gripper_open
+  - gripper_close
+  - vision_capture

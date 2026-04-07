@@ -1,6 +1,8 @@
 """Validator abstract base class for policy validation layer."""
 
 from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional
+
 from agents.policy.action_proposal import Action, ValidationResult
 
 
@@ -12,11 +14,14 @@ class Validator(ABC):
     """
 
     @abstractmethod
-    async def validate_action(self, action: Action) -> ValidationResult:
+    async def validate_action(
+        self, action: Action, robot_state: Optional[Dict[str, Any]] = None
+    ) -> ValidationResult:
         """Validate a single action and return ValidationResult.
 
         Args:
             action: The Action object to validate.
+            robot_state: Optional robot state dictionary for stateful validation.
 
         Returns:
             ValidationResult with valid flag and reason.

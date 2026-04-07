@@ -265,3 +265,151 @@ class TestBoundaryChecker:
         )
         result = await checker.validate_action(action)
         assert result.valid
+
+
+class TestConflictDetector:
+    """Test suite for ConflictDetector validator."""
+
+    @pytest.mark.asyncio
+    async def test_reject_when_arm_is_moving(self):
+        """Test that actions are rejected when arm is already moving."""
+        from agents.policy.validators.conflict import ConflictDetector
+
+        detector = ConflictDetector()
+        robot_state = {"arm_is_moving": True, "emergency_stop": False}
+        action = Action(
+            action_type=ActionType.MOVE_TO,
+            params={"target_pose": [0.5, 0.3, 0.2], "speed": 0.5},
+            expected_outcome=ExpectedOutcomeType.ARM_REACHES_TARGET,
+        )
+        result = await detector.validate_action(action, robot_state)
+        assert result.valid is False
+        assert "moving" in result.reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_reject_when_emergency_stop_active(self):
+        """Test that actions are rejected when emergency stop is active."""
+        from agents.policy.validators.conflict import ConflictDetector
+
+        detector = ConflictDetector()
+        robot_state = {"arm_is_moving": False, "emergency_stop": True}
+        action = Action(
+            action_type=ActionType.GRIPPER_CLOSE,
+            params={"force": 50},
+            expected_outcome=ExpectedOutcomeType.OBJECT_GRASPED,
+        )
+        result = await detector.validate_action(action, robot_state)
+        assert result.valid is False
+
+    @pytest.mark.asyncio
+    async def test_reject_gripper_close_when_already_holding(self):
+        """Test that gripper_close is rejected when already holding object."""
+        from agents.policy.validators.conflict import ConflictDetector
+
+        detector = ConflictDetector()
+        robot_state = {
+            "arm_is_moving": False,
+            "emergency_stop": False,
+            "gripper_holding": True,
+        }
+        action = Action(
+            action_type=ActionType.GRIPPER_CLOSE,
+            params={"force": 50},
+            expected_outcome=ExpectedOutcomeType.OBJECT_GRASPED,
+        )
+        result = await detector.validate_action(action, robot_state)
+        assert result.valid is False
+        assert "already holding" in result.reason.lower()
+
+    @pytest.mark.asyncio
+    async def test_accept_when_state_is_idle(self, move_proposal):
+        """Test that actions are accepted when robot state is idle."""
+        from agents.policy.validators.conflict import ConflictDetector
+
+        detector = ConflictDetector()
+        robot_state = {"arm_is_moving": False, "emergency_stop": False}
+        for action in move_proposal.action_sequence:
+            result = await detector.validate_action(action, robot_state)
+        assert result.valid
+
+    @pytest.mark.asyncio
+    async def test_validator_priority(self):
+        """Test that ConflictDetector has correct priority."""
+        from agents.policy.validators.conflict import ConflictDetector
+
+        detector = ConflictDetector()
+        assert detector.priority() == 3
+
+
+class TestSecondConfirmation:
+    """Test suite for SecondConfirmation validator."""
+
+    @pytest.mark.asyncio
+    async def test_dangerous_action_requires_approval(self, move_proposal):
+        """Test that dangerous actions (move_to) require human approval."""
+        from agents.policy.validators.confirmation import SecondConfirmation
+
+        sc = SecondConfirmation()
+        for action in move_proposal.action_sequence:
+            result = await sc.check_requires_approval(action)
+        assert result.requires_human_approval is True
+
+    @pytest.mark.asyncio
+    async def test_safe_action_no_approval_needed(self, gripper_proposal):
+        """Test that safe actions (gripper_close) don't require approval."""
+        from agents.policy.validators.confirmation import SecondConfirmation
+
+        sc = SecondConfirmation()
+        for action in gripper_proposal.action_sequence:
+            result = await sc.check_requires_approval(action)
+        assert result.requires_human_approval is False
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_requires_approval(self):
+        """Test that emergency_stop requires human approval."""
+        from agents.policy.validators.confirmation import SecondConfirmation
+
+        sc = SecondConfirmation()
+        action = Action(
+            action_type=ActionType.EMERGENCY_STOP,
+            params={},
+            expected_outcome=ExpectedOutcomeType.EMERGENCY_STOPPED,
+        )
+        result = await sc.check_requires_approval(action)
+        assert result.requires_human_approval is True
+
+    @pytest.mark.asyncio
+    async def test_vision_capture_no_approval(self):
+        """Test that vision_capture doesn't require approval."""
+        from agents.policy.validators.confirmation import SecondConfirmation
+
+        sc = SecondConfirmation()
+        action = Action(
+            action_type=ActionType.VISION_CAPTURE,
+            params={},
+            expected_outcome=ExpectedOutcomeType.OBJECT_VISIBLE,
+        )
+        result = await sc.check_requires_approval(action)
+        assert result.requires_human_approval is False
+
+    @pytest.mark.asyncio
+    async def test_validator_priority(self):
+        """Test that SecondConfirmation has correct priority."""
+        from agents.policy.validators.confirmation import SecondConfirmation
+
+        sc = SecondConfirmation()
+        assert sc.priority() == 4
+
+    @pytest.mark.asyncio
+    async def test_validate_action_delegates_to_check(self):
+        """Test that validate_action delegates to check_requires_approval."""
+        from agents.policy.validators.confirmation import SecondConfirmation
+
+        sc = SecondConfirmation()
+        action = Action(
+            action_type=ActionType.MOVE_TO,
+            params={"target_pose": [0.5, 0.3, 0.2], "speed": 0.5},
+            expected_outcome=ExpectedOutcomeType.ARM_REACHES_TARGET,
+        )
+        result = await sc.validate_action(action)
+        assert result.requires_human_approval is True
