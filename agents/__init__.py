@@ -1,76 +1,120 @@
-import sys
-import os
-from importlib.metadata import version, PackageNotFoundError
-from packaging import version as pkg_version
+"""
+agents - EmbodiedAgentsSys 核心包
 
-# Define the minimum required version of sugarcoat
-MIN_SUGARCOAT_VERSION = "0.5.0"
+纯 Python 实现的 4 层机器人代理架构，无 ROS2 依赖。
 
+架构层级：
+  ├─ Perception Layer: RobotObservation
+  ├─ Cognition Layer: Planning, Reasoning, Learning
+  ├─ Execution Layer: Tools framework
+  └─ Feedback Layer: FeedbackLoop
 
-def _print_sugarcoat_error(current_version=None):
-    """
-    Helper to print the standard error message for missing/incompatible sugarcoat.
-    """
-    package_name = "automatika-ros-sugar"
+快速开始：
+  from agents import SimpleAgent
+  agent = SimpleAgent.from_preset("default")
+  result = await agent.run_task("pick up object")
+"""
 
-    print("\n" + "=" * 60)
-    if current_version:
-        print(f"❌ CRITICAL ERROR: Incompatible '{package_name}' version found.")
-        print("=" * 60)
-        print(f"EmbodiedAgents requires {package_name} >= {MIN_SUGARCOAT_VERSION}")
-        print(f"Found version: {current_version}")
-    else:
-        print(f"❌ CRITICAL ERROR: '{package_name}' not found.")
-        print("=" * 60)
-        print(f"EmbodiedAgents depends on {package_name} (Sugarcoat).")
+__version__ = "1.0.0"
 
-    print("\nPLEASE INSTALL THE CORRECT VERSION:")
-    print("-" * 60)
-    print("OPTION 1: Using your Package Manager (Recommended for Ubuntu):")
-    print("  sudo apt install ros-$ROS_DISTRO-automatika-ros-sugar")
-    print("-" * 60)
-    print("OPTION 2: Build from Source (If unsure, use this):")
-    print("  mkdir -p ros-sugar-ws/src")
-    print("  cd ros-sugar-ws/src")
-    print("  git clone https://github.com/automatika-robotics/sugarcoat && cd ..")
-    print("  # Install dependencies (ensure attrs>=23.2.0 is included)")
-    print(
-        "  pip install numpy opencv-python-headless 'attrs>=23.2.0' jinja2 msgpack msgpack-numpy setproctitle pyyaml toml"
-    )
-    print("  colcon build")
-    print("  source install/setup.bash")
-    print("-" * 60)
-    print(
-        "Check the installation docs: https://automatika-robotics.github.io/sugarcoat/installation.html"
-    )
-    print("=" * 60 + "\n")
+# Core types and components
+from agents.core.types import (
+    RobotObservation,
+    SkillResult,
+    AgentConfig,
+)
+from agents.core.agent_loop import RobotAgentLoop
 
-    # Force exit to prevent runtime errors
-    sys.exit(1)
+# Configuration management
+from agents.config.manager import ConfigManager
+from agents.config.schemas import AgentConfigSchema
 
+# Cognition layers
+from agents.cognition.planning import (
+    PlanningLayerBase,
+    DefaultPlanningLayer,
+    PlanningLayer,  # Backward compatibility
+)
+from agents.cognition.reasoning import (
+    ReasoningLayerBase,
+    DefaultReasoningLayer,
+    ReasoningLayer,  # Backward compatibility
+)
+from agents.cognition.learning import (
+    LearningLayerBase,
+    DefaultLearningLayer,
+    LearningLayer,  # Backward compatibility
+)
+from agents.cognition.engine import CognitionEngine
 
-def check_sugarcoat_version():
-    """
-    Verifies that the installed version of automatika-ros-sugar (sugarcoat)
-    meets the minimum requirement for this release of EmbodiedAgents.
-    """
-    package_name = "automatika-ros-sugar"
+# Feedback system
+from agents.feedback.logger import FeedbackLogger
+from agents.feedback.analyzer import FeedbackAnalyzer
+from agents.feedback.loop import FeedbackLoop
 
-    try:
-        installed_ver_str = version(package_name)
+# Execution tools
+from agents.execution.tools.base import ToolBase
+from agents.execution.tools.registry import ToolRegistry
+from agents.execution.tools.strategy import StrategySelector
+from agents.execution.tools.gripper_tool import GripperTool
+from agents.execution.tools.move_tool import MoveTool
+from agents.execution.tools.vision_tool import VisionTool
 
-        # Check if installed version is less than minimum required
-        if pkg_version.parse(installed_ver_str) < pkg_version.parse(
-            MIN_SUGARCOAT_VERSION
-        ):
-            _print_sugarcoat_error(current_version=installed_ver_str)
+# Extensions framework
+from agents.extensions.plugin import PluginBase
+from agents.extensions.registry import PluginRegistry
+from agents.extensions.loader import PluginLoader
+from agents.extensions.preprocessor_plugin import PreprocessorPlugin
+from agents.extensions.postprocessor_plugin import PostprocessorPlugin
+from agents.extensions.visualization_plugin import VisualizationPlugin
 
-    except PackageNotFoundError:
-        _print_sugarcoat_error(current_version=None)
+# Simplified interface
+from agents.simple_agent import SimpleAgent
 
+__all__ = [
+    # Core
+    "RobotObservation",
+    "SkillResult",
+    "AgentConfig",
+    "RobotAgentLoop",
 
-# Check if we are running inside a documentation build
-_IS_DOCS_BUILD = os.environ.get("AGENTS_DOCS_BUILD") == "1"
+    # Configuration
+    "ConfigManager",
+    "AgentConfigSchema",
 
-if not _IS_DOCS_BUILD:
-    check_sugarcoat_version()
+    # Cognition
+    "PlanningLayerBase",
+    "DefaultPlanningLayer",
+    "PlanningLayer",
+    "ReasoningLayerBase",
+    "DefaultReasoningLayer",
+    "ReasoningLayer",
+    "LearningLayerBase",
+    "DefaultLearningLayer",
+    "LearningLayer",
+    "CognitionEngine",
+
+    # Feedback
+    "FeedbackLogger",
+    "FeedbackAnalyzer",
+    "FeedbackLoop",
+
+    # Execution
+    "ToolBase",
+    "ToolRegistry",
+    "StrategySelector",
+    "GripperTool",
+    "MoveTool",
+    "VisionTool",
+
+    # Extensions
+    "PluginBase",
+    "PluginRegistry",
+    "PluginLoader",
+    "PreprocessorPlugin",
+    "PostprocessorPlugin",
+    "VisualizationPlugin",
+
+    # Simple interface
+    "SimpleAgent",
+]

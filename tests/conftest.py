@@ -60,6 +60,15 @@ _agents = sys.modules.get("agents")
 if _agents is not None and _file_is_wrong(_agents, _CORRECT_AGENTS_INIT):
     _purge_subtree("agents")
 
+# Clean up agents.config if it's the old config.py instead of the config/ package
+_config = sys.modules.get("agents.config")
+if _config is not None and hasattr(_config, "__path__"):
+    # It's a package, keep it
+    pass
+elif _config is not None:
+    # It's the old config.py, remove it so agents.config/ package can be used
+    _purge_subtree("agents.config")
+
 # Clean up any broken/None placeholder entries left by earlier import attempts
 for _mod_name in list(sys.modules.keys()):
     if sys.modules[_mod_name] is None and _mod_name.startswith("agents"):
@@ -98,3 +107,151 @@ for _mod_name in _PRELOAD:
             importlib.import_module(_mod_name)
         except Exception:
             pass  # Best-effort; individual tests will surface the real error
+
+
+# ============================================================================
+# TDD 测试框架：Fixtures 和 Mocks
+# ============================================================================
+
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+import numpy as np
+
+
+# ============================================================================
+# 基础类型 Fixtures
+# ============================================================================
+
+@pytest.fixture
+def dummy_config():
+    """虚拟代理配置"""
+    class DummyConfig:
+        def __init__(self):
+            self.agent_name = "test_agent"
+            self.max_steps = 100  # 足够多的步骤用于测试
+            self.llm_model = "qwen"
+            self.perception_enabled = True
+
+    return DummyConfig()
+
+
+@pytest.fixture
+def dummy_observation():
+    """虚拟机器人观察数据"""
+    class DummyObservation:
+        def __init__(self):
+            self.image = None
+            self.state = {"ready": True}
+            self.gripper = {"position": 0.5}
+            self.timestamp = 1000.0
+
+    return DummyObservation()
+
+
+@pytest.fixture
+def dummy_skill_result():
+    """虚拟技能执行结果"""
+    class DummySkillResult:
+        def __init__(self, success=True, message="success", data=None):
+            self.success = success
+            self.message = message
+            self.data = data or {}
+
+    return DummySkillResult()
+
+
+# ============================================================================
+# Provider Fixtures（提供者 mocks）
+# ============================================================================
+
+@pytest.fixture
+def dummy_llm_provider():
+    """虚拟 LLM 提供者"""
+    mock = AsyncMock()
+    mock.generate_action = AsyncMock(return_value="mock_action_code")
+    mock.generate_code = AsyncMock(return_value="print('executing')")
+    mock.called = False
+
+    async def track_call(*args, **kwargs):
+        mock.called = True
+        return "mock_action"
+
+    mock.generate_action = AsyncMock(side_effect=track_call)
+    return mock
+
+
+@pytest.fixture
+def dummy_perception_provider(dummy_observation):
+    """虚拟感知提供者"""
+    mock = AsyncMock()
+    mock.called = False
+
+    async def track_call(*args, **kwargs):
+        mock.called = True
+        return dummy_observation
+
+    mock.get_observation = AsyncMock(side_effect=track_call)
+    return mock
+
+
+@pytest.fixture
+def dummy_executor(dummy_skill_result):
+    """虚拟执行器"""
+    mock = AsyncMock()
+    mock.called = False
+
+    async def track_call(*args, **kwargs):
+        mock.called = True
+        return dummy_skill_result
+
+    mock.execute = AsyncMock(side_effect=track_call)
+    return mock
+
+
+# ============================================================================
+# 配置相关 Fixtures
+# ============================================================================
+
+@pytest.fixture
+def temp_config_yaml(tmp_path):
+    """临时 YAML 配置文件"""
+    import yaml
+
+    config_data = {
+        "agent_name": "test_agent",
+        "max_steps": 100,
+        "llm_model": "qwen",
+        "perception_enabled": True,
+    }
+
+    config_file = tmp_path / "test_config.yaml"
+    with open(config_file, "w") as f:
+        yaml.dump(config_data, f)
+
+    return str(config_file)
+
+
+# ============================================================================
+# 测试环境清理
+# ============================================================================
+
+@pytest.fixture(autouse=True)
+def cleanup_env():
+    """清理环境变量（每个测试后）"""
+    # 保存原始环境变量
+    original_env = os.environ.copy()
+
+    yield
+
+    # 恢复环境变量
+    os.environ.clear()
+    os.environ.update(original_env)
+
+
+# ============================================================================
+# 常用工具函数
+# ============================================================================
+
+def create_test_image(shape=(480, 640, 3)):
+    """创建测试图像（numpy 数组）"""
+    return np.random.randint(0, 255, shape, dtype=np.uint8)
