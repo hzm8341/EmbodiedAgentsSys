@@ -1,0 +1,5 @@
+# Default configuration preset for EmbodiedAgentsSys
+agent_name: default_agent
+max_steps: 100
+llm_model: qwen
+perception_enabled: true

@@ -1,0 +1,5 @@
+# VLA+ configuration preset
+agent_name: vla_plus_agent
+max_steps: 100
+llm_model: qwen
+perception_enabled: true
