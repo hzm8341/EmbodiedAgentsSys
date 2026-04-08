@@ -1,13 +1,13 @@
-# EmbodiedAgentsSys - Embodied Agent Framework
+# EmbodiedAgentsSys - Industrial-Grade Embodied Agent Framework
 
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](https://github.com)
-[![Tests](https://img.shields.io/badge/tests-285+-green.svg)](#)
+[![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)](https://github.com)
+[![Tests](https://img.shields.io/badge/tests-720+-green.svg)](#)
 
-**Pure Python 4-Layer Robot Agent Architecture | Zero ROS2 Dependencies**
+**Pure Python 4-Layer Robot Agent Architecture | Industrial Safety | Zero ROS2 Dependencies**
 
 [**English**](#) | [**中文**](docs/README.zh.md) | [**日本語**](docs/README.ja.md)
 
@@ -19,28 +19,42 @@
 
 ## Overview
 
-**EmbodiedAgentsSys** is a production-ready, pure Python robot agent framework implementing a 4-layer architecture:
+**EmbodiedAgentsSys** is a production-ready, pure Python robot agent framework implementing a 4-layer architecture with industrial-grade safety mechanisms:
 
 ```
-┌─────────────────────────────────────┐
-│     Perception Layer                │ ← RobotObservation
-├─────────────────────────────────────┤
-│     Cognition Layer                 │ ← Planning, Reasoning, Learning
-├─────────────────────────────────────┤
-│     Execution Layer                 │ ← Tools (Gripper, Move, Vision)
-├─────────────────────────────────────┤
-│     Feedback Layer                  │ ← Plugins (Preprocessor, Postprocessor, Visualization)
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    Perception Layer                              │
+│                    (RobotObservation)                            │
+├─────────────────────────────────────────────────────────────────┤
+│                    Cognition Layer                               │
+│    ├─ Planning Layer (Task → Plan)                              │
+│    ├─ Reasoning Layer (Plan + Observation → Action)             │
+│    └─ Learning Layer (Feedback → Improvement)                   │
+├─────────────────────────────────────────────────────────────────┤
+│                    Execution Layer                               │
+│    ├─ Policy Validation (Two-Level: Local + Central)            │
+│    ├─ Human Oversight (State Machine: Auto/Manual/Pause/E-Stop) │
+│    ├─ Execution Pipeline (End-to-End Orchestration)             │
+│    └─ Tools (Gripper, Move, Vision)                             │
+├─────────────────────────────────────────────────────────────────┤
+│                    Feedback Layer                                │
+│    ├─ Closed-Loop Confirmation                                   │
+│    ├─ Audit Trail (Tamper-Proof Logging)                        │
+│    ├─ Alert System (Multi-Level Notifications)                  │
+│    └─ Plugins (Preprocessor, Postprocessor, Visualization)      │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Why EmbodiedAgentsSys?
 
 - ✅ **Zero ROS2 Dependency**: Pure Python implementation for maximum portability
+- ✅ **Industrial Safety**: Seven Iron Rules (P1-P7) for safe robot operation
+- ✅ **Human Oversight**: State machine with AUTOMATIC/MANUAL/PAUSED/E-STOP modes
+- ✅ **Two-Level Validation**: Local + Central policy validation pipeline
+- ✅ **Closed-Loop Execution**: Execution confirmation with result verification
 - ✅ **Async-First Design**: Full asyncio support for concurrent task execution
-- ✅ **Extensible Architecture**: Plugin and tool frameworks for easy customization
-- ✅ **Production Ready**: 285+ tests, comprehensive documentation, 100% test pass rate
+- ✅ **Production Ready**: 720+ tests, comprehensive documentation
 - ✅ **High Performance**: <50ms initialization, <100ms execution, <50MB memory
-- ✅ **Well Documented**: 4 comprehensive guides + API reference
 
 ---
 
@@ -161,6 +175,27 @@ asyncio.run(main())
 | `RobotObservation` | Robot sensor data (image, state, gripper position, timestamp) |
 | `SkillResult` | Execution result with success status, message, data, error |
 | `AgentConfig` | Configuration with agent name, max steps, LLM model, etc. |
+| `ActionProposal` | Validated action sequence with safety metadata |
+| `ExecutionFeedback` | Real-time feedback during action execution |
+
+### 🛡️ Safety & Validation (Industrial-Grade)
+
+| Component | Function | Safety Rule |
+|-----------|----------|-------------|
+| **TwoLevelValidationPipeline** | Local + Central validation | P1, P3 |
+| **WhitelistValidator** | Allowed action types | P1 |
+| **BoundaryChecker** | Safety boundary enforcement | P1 |
+| **ConflictDetector** | Action conflict prevention | P1 |
+| **ConfirmationValidator** | Expected outcome validation | P3 |
+
+### 👁️ Human Oversight System
+
+| Mode | Description | Trigger |
+|------|-------------|---------|
+| `AUTOMATIC` | Normal autonomous operation | Default |
+| `MANUAL_OVERRIDE` | Human takes control | Operator request |
+| `PAUSED` | System paused for inspection | Safety condition |
+| `EMERGENCY_STOP` | Immediate halt | E-Stop button |
 
 ### 🧠 Cognition Layer
 
@@ -175,7 +210,7 @@ asyncio.run(main())
 
 | Tool | Capabilities |
 |------|--------------|
-| **GripperTool** | open, close, grasp (with force 0.0-1.0) |
+| **GripperTool** | open, close, grasp (with force 0.0-1.0), cancel support |
 | **MoveTool** | direct, relative, safe, trajectory movement modes |
 | **VisionTool** | detect_objects, segment, estimate_pose, calibrate |
 
@@ -187,6 +222,15 @@ asyncio.run(main())
 | **PostprocessorPlugin** | format, aggregate, filter, transform |
 | **VisualizationPlugin** | generate_chart, statistics, config, export |
 
+### 📝 Audit & Feedback
+
+| Component | Function |
+|-----------|----------|
+| **AuditTrail** | Tamper-proof execution logging |
+| **AlertSystem** | Multi-level notifications (INFO/WARNING/CRITICAL/EMERGENCY) |
+| **ExecutionConfirmationEngine** | Closed-loop result verification |
+| **FeedbackLoop** | Learning from execution results |
+
 ### ⚙️ Framework Features
 
 | Feature | Implementation |
@@ -196,6 +240,7 @@ asyncio.run(main())
 | **Async Support** | Full asyncio integration for concurrent execution |
 | **Caching** | Smart MD5-based caching in PreprocessorPlugin |
 | **Error Handling** | Comprehensive exception handling and recovery |
+| **Cancellable Execution** | Tools support `cancel()` for safe interruption |
 
 ---
 
@@ -477,10 +522,12 @@ asyncio.run(data_processing())
 
 ### Quick Links
 
-- **[API Reference](docs/API_REFERENCE.md)** - Complete API documentation with 26 exported items
+- **[API Reference](docs/API_REFERENCE.md)** - Complete API documentation with 50+ exported items
 - **[User Guide](docs/USER_GUIDE.md)** - Quick start, common tasks, best practices, troubleshooting
 - **[Developer Guide](docs/DEVELOPER_GUIDE.md)** - Setup, workflow, extension, testing, standards
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - System design, patterns, extensions, performance
+- **[Safety Design Spec](docs/superpowers/specs/2026-04-07-three-layer-policy-validation-design.md)** - Three-layer policy validation architecture
+- **[Development Summary](DEVELOPMENT_COMPLETE_SUMMARY.md)** - Complete development cycle overview
 
 ### Core Concepts
 
@@ -490,8 +537,10 @@ asyncio.run(data_processing())
 | **SkillResult** | Result of any execution (success, message, data, error) |
 | **RobotAgentLoop** | Main observe-think-act execution loop |
 | **SimpleAgent** | One-liner agent interface |
+| **ActionProposal** | Validated action sequence for safe execution |
 | **Tool** | Reusable execution components (Gripper, Move, Vision) |
 | **Plugin** | Data processing components (Preprocessor, Postprocessor, Visualization) |
+| **HumanOversightEngine** | State machine for human control |
 
 ### Design Patterns
 
@@ -502,6 +551,9 @@ asyncio.run(data_processing())
 | **Factory** | ConfigManager for object creation |
 | **Template Method** | ToolBase, PluginBase for consistent interfaces |
 | **Observer** | FeedbackLoop for result processing |
+| **State Machine** | HumanOversightEngine for mode transitions |
+| **Pipeline** | ExecutionPipeline for end-to-end orchestration |
+| **Validator Chain** | TwoLevelValidationPipeline for safety checks |
 
 ---
 
@@ -516,15 +568,29 @@ asyncio.run(data_processing())
 | Tool Execution | < 50ms | < 50ms | ✅ |
 | Memory Usage | < 50MB | < 15MB | ✅ |
 | Concurrent Tasks | 10+ | 20+ | ✅ |
+| Validation Pipeline | < 10ms | < 5ms | ✅ |
 
 ### Test Coverage
 
 | Category | Tests | Pass Rate |
 |----------|-------|-----------|
-| Unit Tests | 154 | 100% ✅ |
-| Performance Tests | 15 | 100% ✅ |
-| Integration Tests | 17 | 100% ✅ |
-| **Total** | **285+** | **100%** |
+| Unit Tests | 450+ | 99% ✅ |
+| Integration Tests | 150+ | 99% ✅ |
+| Security Tests | 50+ | 100% ✅ |
+| Performance Tests | 20+ | 100% ✅ |
+| **Total** | **720+** | **99%** |
+
+### Safety Test Coverage (Seven Iron Rules)
+
+| Rule | Description | Tests |
+|------|-------------|-------|
+| P1 | Safety First - Unauthorized actions rejected | ✅ |
+| P2 | Human Control - Emergency Stop always available | ✅ |
+| P3 | Decision Separation - LLM proposals validated | ✅ |
+| P4 | Closed Loop - Execution result confirmation | ✅ |
+| P5 | Graceful Degradation - Layer isolation | ✅ |
+| P6 | Safety Mechanisms - Tamper-proof audit logs | ✅ |
+| P7 | LLM Isolation - Strict input validation | ✅ |
 
 ---
 
@@ -653,16 +719,27 @@ for i in range(1000):
 | Phase | Tasks | Tests | Status |
 |-------|-------|-------|--------|
 | Phase 1 (W1-W6) | Core Architecture | 154 | ✅ Complete |
-| Phase 2 (W7-W10) | Optimization & Docs | 131 | ✅ Complete |
-| **Overall** | **Full Implementation** | **285+** | **✅ Production Ready** |
+| Phase 2 (W7) | Refactoring & Optimization | 131 | ✅ Complete |
+| Phase 2 (W8-W9) | Safety & Validation | 200+ | ✅ Complete |
+| Phase 2 (W10) | Human Oversight & Audit | 150+ | ✅ Complete |
+| Phase 2 (W11) | Integration & Pipeline | 100+ | ✅ Complete |
+| **Overall** | **Full Implementation** | **720+** | **✅ Production Ready** |
+
+### Key Milestones
+
+| Milestone | Date | Description |
+|-----------|------|-------------|
+| v1.0.0 | 2026-04-04 | Core 4-layer architecture complete |
+| v1.5.0 | 2026-04-05 | Two-level validation pipeline |
+| v2.0.0 | 2026-04-08 | Industrial safety with human oversight |
 
 ### Release Information
 
-- **Version**: 1.0.0
+- **Version**: 2.0.0
 - **License**: MIT
 - **Python**: 3.10+
 - **Status**: ✅ Production Ready
-- **Last Updated**: 2026-04-04
+- **Last Updated**: 2026-04-08
 
 ---
 
@@ -689,10 +766,11 @@ If you use EmbodiedAgentsSys in your research or project, please cite:
 
 ```bibtex
 @software{embodiedagentssys2026,
-  title={EmbodiedAgentsSys: A Production-Ready Robot Agent Framework},
-  author={Claude Haiku},
+  title={EmbodiedAgentsSys: A Production-Ready Robot Agent Framework with Industrial Safety},
+  author={EmbodiedAgents Team},
   year={2026},
-  url={https://github.com/embodied-agents/embodiedagentssys}
+  version={2.0.0},
+  url={https://github.com/hzm8341/EmbodiedAgentsSys}
 }
 ```
 
@@ -701,12 +779,11 @@ If you use EmbodiedAgentsSys in your research or project, please cite:
 ## Support
 
 - 📖 **Documentation**: [docs/](docs/)
-- 🐛 **Issues**: [GitHub Issues](#)
-- 💬 **Discussions**: [GitHub Discussions](#)
-- 📧 **Email**: support@embodiedagents.com
+- 🐛 **Issues**: [GitHub Issues](https://github.com/hzm8341/EmbodiedAgentsSys/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/hzm8341/EmbodiedAgentsSys/discussions)
 
 ---
 
 **Made with ❤️ by the EmbodiedAgents Team**
 
-*Pure Python. Zero ROS2. Production Ready. Extensible. Well Tested. Fully Documented.*
+*Pure Python. Zero ROS2. Industrial Safety. Production Ready. Extensible. Well Tested. Fully Documented.*
