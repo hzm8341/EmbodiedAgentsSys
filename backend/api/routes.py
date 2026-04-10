@@ -1,4 +1,5 @@
 """API 路由"""
+from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 from backend.services.simulation import simulation_service
@@ -7,7 +8,7 @@ router = APIRouter()
 
 class ExecuteRequest(BaseModel):
     action: str
-    params: dict = {}
+    params: dict[str, Any] = {}
 
 class ExecuteResponse(BaseModel):
     status: str

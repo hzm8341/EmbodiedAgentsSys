@@ -1,6 +1,5 @@
 """仿真环境管理服务"""
 from typing import Optional
-import gymnasium as gym
 from simulation.mujoco import GymnasiumEnvDriver
 
 class SimulationService:
