@@ -4,6 +4,7 @@ import { DetectionPanel } from './DetectionPanel'
 import { ScenePanel } from './ScenePanel'
 import { SettingsPanel } from './SettingsPanel'
 import { RobotControl } from './RobotControl'
+import RobotPanel from './RobotPanel'
 
 interface MainAreaProps {
   activeItem: string
@@ -18,6 +19,7 @@ export const MainArea = ({ activeItem }: MainAreaProps) => {
       {activeItem === 'detection' && <DetectionPanel />}
       {activeItem === 'settings' && <SettingsPanel />}
       {activeItem === 'robot' && <RobotControl />}
+      {activeItem === 'urdf' && <RobotPanel />}
     </main>
   )
 }
