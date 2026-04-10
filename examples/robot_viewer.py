@@ -65,7 +65,7 @@ class SimpleRobotViewer:
 
     def _command_loop(self):
         """命令循环"""
-        while self.running and self.viewer.is_running():
+        while self.running:
             try:
                 # 非阻塞输入检查
                 import select
@@ -73,6 +73,9 @@ class SimpleRobotViewer:
                     cmd = sys.stdin.readline()
                     if cmd:
                         self._execute_command(cmd.strip())
+                    else:
+                        # EOF
+                        break
             except (EOFError, OSError):
                 break
             except KeyboardInterrupt:
@@ -88,6 +91,8 @@ class SimpleRobotViewer:
 
         if cmd == "quit" or cmd == "exit":
             self.running = False
+            if self.viewer:
+                self.viewer.close()
             return
 
         if cmd == "status":
@@ -116,7 +121,7 @@ class SimpleRobotViewer:
             return
 
         try:
-            joints = [float(p) for p in parts[1:7]]
+            joints = [float(p) for p in parts[1:8]]  # 7 个关节
             joints = np.array(joints)
 
             # 7 个关节 + 2 个夹爪 = 9 个控制
