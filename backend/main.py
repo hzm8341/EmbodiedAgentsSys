@@ -1,7 +1,8 @@
 """FastAPI 后端入口 - LLM 机器人控制"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.api.routes import router
+from backend.api.routes import router as routes_router
+from backend.api import urdf, state
 
 app = FastAPI(title="LLM Robot Control API")
 
@@ -13,7 +14,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix="/api")
+app.include_router(routes_router, prefix="/api")
+app.include_router(urdf.router)
+app.include_router(state.router)
 
 @app.get("/health")
 def health():
