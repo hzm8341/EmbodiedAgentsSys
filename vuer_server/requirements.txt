@@ -1,0 +1,6 @@
+vuer>=0.10.0
+numpy
+pyzmq
+pydantic
+fastapi
+websockets
