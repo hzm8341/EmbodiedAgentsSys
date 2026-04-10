@@ -19,6 +19,7 @@ class SceneBuilder:
         self._timestep = timestep
         self._bodies = []  # [(name, type, pos, size, rgba)]
         self._ground = True
+        self._ground_friction = (1.0, 0.005, 0.0001)
         self._model = None
         self._data = None
 
@@ -29,6 +30,7 @@ class SceneBuilder:
             friction: (sliding, torsional, rolling) 摩擦系数
         """
         self._ground = True
+        self._ground_friction = friction
         return self
 
     def add_body(
@@ -88,7 +90,8 @@ class SceneBuilder:
         # 地面
         if self._ground:
             parts.append('<body name="ground" pos="0 0 0">')
-            parts.append('<geom type="plane" size="2 2 0.1" rgba="0.8 0.8 0.8 1"/>')
+            friction_str = f"{self._ground_friction[0]} {self._ground_friction[1]} {self._ground_friction[2]}"
+            parts.append(f'<geom type="plane" size="2 2 0.1" rgba="0.8 0.8 0.8 1" condim="3" friction="{friction_str}"/>')
             parts.append('</body>')
 
         # 几何体
