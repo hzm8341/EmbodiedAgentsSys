@@ -33,7 +33,6 @@ class MuJoCoDriver:
             urdf_path: 机器人 URDF 路径（可选）
             timestep: 仿真时间步
         """
-        self._timestep = timestep
         self._robot = RobotModel(urdf_path=urdf_path)
         self._force_sensor = ForceSensor()
         self._contact_sensor = ContactSensor()
@@ -111,7 +110,7 @@ class MuJoCoDriver:
         z = params.get("z", 0.0)
 
         # 范围检查
-        if abs(x) > POSITION_LIMIT or abs(y) > POSITION_LIMIT or z > Z_HEIGHT_LIMIT:
+        if abs(x) > POSITION_LIMIT or abs(y) > POSITION_LIMIT or z < 0 or z > Z_HEIGHT_LIMIT:
             return ExecutionReceipt(
                 action_type="move_to",
                 params=params,
@@ -152,7 +151,7 @@ class MuJoCoDriver:
         new_pos = current_pos + np.array([dx, dy, dz])
 
         # 范围检查
-        if abs(new_pos[0]) > POSITION_LIMIT or abs(new_pos[1]) > POSITION_LIMIT or new_pos[2] > Z_HEIGHT_LIMIT:
+        if abs(new_pos[0]) > POSITION_LIMIT or abs(new_pos[1]) > POSITION_LIMIT or new_pos[2] < 0 or new_pos[2] > Z_HEIGHT_LIMIT:
             return ExecutionReceipt(
                 action_type="move_relative",
                 params=params,
@@ -173,7 +172,11 @@ class MuJoCoDriver:
         )
 
     def _grasp(self, params: dict) -> ExecutionReceipt:
-        """抓取物体（简化版：无真实物理抓取）"""
+        """抓取物体（简化版：无真实物理抓取）
+
+        Note: force parameter is accepted for API compatibility but not applied
+        to physics simulation in this simplified implementation.
+        """
         object_id = params.get("object_id", "target")
         force = params.get("force", 0.5)
 
