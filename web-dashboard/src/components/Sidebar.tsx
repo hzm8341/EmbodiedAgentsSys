@@ -9,6 +9,7 @@ const items: SidebarItem[] = [
   { id: 'camera', icon: '📷', label: '相机' },
   { id: 'scene', icon: '🔍', label: '场景分析' },
   { id: 'detection', icon: '🎯', label: '检测' },
+  { id: 'robot', icon: '🤖', label: '机器人控制' },
   { id: 'settings', icon: '⚙️', label: '设置' },
 ]
 

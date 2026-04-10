@@ -3,6 +3,7 @@ import { CameraPanel } from './CameraPanel'
 import { DetectionPanel } from './DetectionPanel'
 import { ScenePanel } from './ScenePanel'
 import { SettingsPanel } from './SettingsPanel'
+import { RobotControl } from './RobotControl'
 
 interface MainAreaProps {
   activeItem: string
@@ -16,6 +17,7 @@ export const MainArea = ({ activeItem }: MainAreaProps) => {
       {activeItem === 'scene' && <ScenePanel />}
       {activeItem === 'detection' && <DetectionPanel />}
       {activeItem === 'settings' && <SettingsPanel />}
+      {activeItem === 'robot' && <RobotControl />}
     </main>
   )
 }
