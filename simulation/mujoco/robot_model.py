@@ -43,9 +43,13 @@ class RobotModel:
         try:
             self._model = mujoco.MjModel.from_xml_path(urdf_path)
             self._data = mujoco.MjData(self._model)
-            self._joint_names = [name for name in self._model.names if name]
+            self._joint_names = [
+                mujoco.mj_id2name(self._model, mujoco.mjtObj.mjOBJ_JOINT, i)
+                for i in range(self._model.njnt)
+                if mujoco.mj_id2name(self._model, mujoco.mjtObj.mjOBJ_JOINT, i)
+            ]
         except Exception as e:
-            raise RuntimeError(f"Failed to load URDF: {e}")
+            raise RuntimeError(f"Failed to load URDF: {e}") from e
 
     def _create_empty_robot(self) -> None:
         """创建空载（用于测试）"""
@@ -84,22 +88,21 @@ class RobotModel:
 
         Args:
             positions: 字典，key 为关节名，value 为目标位置（弧度或米）
+
+        Raises:
+            RuntimeError: 如果数据未初始化
         """
         if self._data is None:
-            return
+            raise RuntimeError("Data not initialized")
 
         for name, value in positions.items():
-            joint_id = self._model.name2id(name, "joint")
             self._data.joint(name).qpos = value
 
     def get_joint_positions(self) -> dict[str, float]:
         """获取当前关节位置"""
         positions = {}
         for name in self._joint_names:
-            try:
-                positions[name] = self._data.joint(name).qpos
-            except Exception:
-                pass
+            positions[name] = self._data.joint(name).qpos
         return positions
 
     def get_base_position(self) -> np.ndarray:
