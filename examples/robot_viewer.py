@@ -53,11 +53,35 @@ class SimpleRobotViewer:
         # 创建被动查看器
         print("打开查看器窗口...")
         self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
-        print("查看器窗口已打开!")
+        print("查看器窗口已打开! MuJoCo 窗口会实时显示仿真结果")
         print()
 
-        # 保持查看器运行
-        self._command_loop()
+        # 启动查看器和仿真循环
+        self._viewer_loop()
+
+    def _viewer_loop(self):
+        """查看器和仿真主循环"""
+        while self.running and self.viewer.is_running():
+            # 运行仿真
+            mujoco.mj_step(self.model, self.data)
+
+            # 同步查看器
+            self.viewer.sync()
+
+            # 处理命令（非阻塞）
+            try:
+                import select
+                if select.select([sys.stdin], [], [], 0.01)[0]:
+                    cmd = sys.stdin.readline()
+                    if cmd:
+                        self._execute_command(cmd.strip())
+                    else:
+                        break
+            except (EOFError, OSError):
+                break
+            except KeyboardInterrupt:
+                print("\n退出中...")
+                break
 
         self.viewer.close()
 
@@ -123,12 +147,9 @@ class SimpleRobotViewer:
             # 设置关节控制 (前7个)
             self.data.ctrl[:7] = joints
 
-            # 仿真几步
-            for _ in range(100):
+            # 运行几步仿真
+            for _ in range(200):
                 mujoco.mj_step(self.model, self.data)
-
-            # 更新前向运动学
-            mujoco.mj_forward(self.model, self.data)
 
             print("关节角度已设置: %s" % str(joints))
             self._show_status()
