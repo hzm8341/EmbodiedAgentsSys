@@ -117,16 +117,20 @@ class SimpleRobotViewer:
 
         try:
             joints = [float(p) for p in parts[1:7]]
-            self.target_pos = np.array(joints)
+            joints = np.array(joints)
 
-            # 设置关节控制
-            self.data.ctrl[:7] = self.target_pos
+            # 7 个关节 + 2 个夹爪 = 9 个控制
+            nu = self.model.nu
+            n_joints = min(len(joints), nu)
+
+            # 设置关节控制 (前7个)
+            self.data.ctrl[:7] = joints[:7]
 
             # 仿真几步
             for _ in range(50):
                 mujoco.mj_step(self.model, self.data)
 
-            print(f"关节角度已设置为: {joints}")
+            print(f"关节角度已设置: {joints}")
             self._show_status()
         except ValueError as e:
             print(f"解析错误: {e}")
