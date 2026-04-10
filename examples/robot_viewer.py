@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 简化版机器人查看器 - 使用原生 MuJoCo
-直接加载 XML 模型，提供交互式命令控制
+多线程版本：渲染和命令输入分离
 """
 
 import sys
@@ -10,6 +10,8 @@ sys.path.insert(0, "/media/hzm/Data/EmbodiedAgentsSys")
 import mujoco
 import mujoco.viewer
 import numpy as np
+import threading
+import time
 
 
 class SimpleRobotViewer:
@@ -19,8 +21,10 @@ class SimpleRobotViewer:
         self.xml_path = xml_path or "/media/hzm/Data/EmbodiedAgentsSys/RL-Robot-Manipulation/panda_mujoco_gym/assets/push.xml"
         self.model = None
         self.data = None
-        self.running = True
         self.viewer = None
+        self.running = True
+        self.command_queue = []
+        self.lock = threading.Lock()
 
     def load(self):
         """加载模型"""
@@ -53,54 +57,58 @@ class SimpleRobotViewer:
         # 创建被动查看器
         print("打开查看器窗口...")
         self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
-        print("查看器窗口已打开! MuJoCo 窗口会实时显示仿真结果")
+        print("查看器窗口已打开!")
         print()
 
-        # 启动查看器和仿真循环
-        self._viewer_loop()
+        # 启动输入线程
+        input_thread = threading.Thread(target=self._input_loop, daemon=True)
+        input_thread.start()
 
-    def _viewer_loop(self):
-        """查看器和仿真主循环"""
+        # 主循环：仿真 + 渲染
+        self._main_loop()
+
+        self.viewer.close()
+
+    def _input_loop(self):
+        """输入线程 - 非阻塞读取命令"""
+        while self.running:
+            try:
+                cmd = input()
+                if cmd.strip():
+                    with self.lock:
+                        self.command_queue.append(cmd.strip())
+            except EOFError:
+                break
+            except KeyboardInterrupt:
+                break
+            except Exception:
+                pass
+            time.sleep(0.01)
+
+    def _main_loop(self):
+        """主循环"""
+        last_status_time = 0
+
         while self.running and self.viewer.is_running():
+            # 处理命令
+            with self.lock:
+                if self.command_queue:
+                    cmd = self.command_queue.pop(0)
+                    self._execute_command(cmd)
+
             # 运行仿真
             mujoco.mj_step(self.model, self.data)
 
             # 同步查看器
             self.viewer.sync()
 
-            # 处理命令（非阻塞）
-            try:
-                import select
-                if select.select([sys.stdin], [], [], 0.01)[0]:
-                    cmd = sys.stdin.readline()
-                    if cmd:
-                        self._execute_command(cmd.strip())
-                    else:
-                        break
-            except (EOFError, OSError):
-                break
-            except KeyboardInterrupt:
-                print("\n退出中...")
-                break
+            # 每秒显示一次状态
+            current_time = time.time()
+            if current_time - last_status_time > 2.0:
+                last_status_time = current_time
+                # 可选：定期显示状态
 
-        self.viewer.close()
-
-    def _command_loop(self):
-        """命令循环"""
-        while self.running:
-            try:
-                import select
-                if select.select([sys.stdin], [], [], 0.1)[0]:
-                    cmd = sys.stdin.readline()
-                    if cmd:
-                        self._execute_command(cmd.strip())
-                    else:
-                        break
-            except (EOFError, OSError):
-                break
-            except KeyboardInterrupt:
-                print("\n退出中...")
-                break
+            time.sleep(0.001)  # 1ms 循环
 
     def _execute_command(self, cmd: str):
         """执行命令"""
@@ -109,10 +117,10 @@ class SimpleRobotViewer:
         if not cmd:
             return
 
+        print("执行: %s" % cmd)
+
         if cmd == "quit" or cmd == "exit":
             self.running = False
-            if self.viewer:
-                self.viewer.close()
             return
 
         if cmd == "status":
@@ -168,10 +176,8 @@ class SimpleRobotViewer:
             self.data.ctrl[7] = value
             self.data.ctrl[8] = value
 
-            for _ in range(100):
+            for _ in range(200):
                 mujoco.mj_step(self.model, self.data)
-
-            mujoco.mj_forward(self.model, self.data)
 
             print("夹爪开度已设置为: %.4f" % value)
             self._show_status()
@@ -179,31 +185,28 @@ class SimpleRobotViewer:
             print("解析错误: %s" % str(e))
 
     def _cmd_move(self, cmd: str):
-        """移动末端到目标位置 (简化版)"""
+        """移动末端到目标位置"""
         parts = cmd.split()
         if len(parts) < 4:
-            print("需要 x y z 三个值，例如: move 0.5 0.0 0.3")
+            print("需要 x y z 三个值")
             return
 
         try:
             x, y, z = float(parts[1]), float(parts[2]), float(parts[3])
             print("目标位置: x=%.3f, y=%.3f, z=%.3f" % (x, y, z))
-            print("(简化版: 调整到默认关节角度)")
             # 简化：设置默认关节角度
             default_joints = np.array([0.0, 0.4, 0.0, -1.2, 0.0, 1.8, 0.5])
             self.data.ctrl[:7] = default_joints
 
-            for _ in range(100):
+            for _ in range(200):
                 mujoco.mj_step(self.model, self.data)
 
-            mujoco.mj_forward(self.model, self.data)
             self._show_status()
         except ValueError as e:
             print("解析错误: %s" % str(e))
 
     def _show_status(self):
         """显示状态"""
-        # 获取 ee_center_body 位置
         ee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "ee_center_body")
         ee_pos = self.data.xpos[ee_id]
 
