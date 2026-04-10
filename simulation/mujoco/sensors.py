@@ -49,7 +49,7 @@ class ForceSensor:
             return {"force": np.zeros(3), "torque": np.zeros(3)}
 
         # 获取末端执行器力/力矩
-        # 这里简化处理，实际应该用 wrench 或专门的 sensor
+        # 从 cfrc_ext 获取 body 上的外部合力/力矩 (wrench)
         wrench = np.zeros(6)
         if self._sensor_id is not None:
             # 从 cfrc_ext 获取外部力
@@ -109,10 +109,10 @@ class ContactSensor:
         contacts = []
         for i in range(self._data.ncon):
             contact = self._data.contact[i]
-            if contact.dist < 0:  # 有效接触
+            if contact.dist >= 0:  # 有效接触 (dist >= 0 表示几何体重叠)
                 contacts.append({
                     "position": contact.pos.copy(),
-                    "normal": contact.frame[:3].copy(),  # 法向量
+                    "normal": contact.frame[:3].reshape(3, 3)[:, 0].copy(),  # first column = normal
                     "force": np.linalg.norm(contact.force),
                     "geom1": contact.geom1,
                     "geom2": contact.geom2,
