@@ -4,7 +4,7 @@ import gymnasium as gym
 import numpy as np
 from typing import Optional, Tuple
 
-from embodiedagents.hal.types import ExecutionReceipt, ExecutionStatus
+from embodiedagentsys.hal.types import ExecutionReceipt, ExecutionStatus
 
 
 class GymnasiumEnvDriver:

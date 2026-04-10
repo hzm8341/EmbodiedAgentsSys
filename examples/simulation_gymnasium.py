@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Gymnasium 环境示例 - 使用 RL-Robot-Manipulation 环境"""
 
+# 先导入以注册环境
+import panda_mujoco_gym.envs  # noqa: F401
+
 from simulation.mujoco import GymnasiumEnvDriver
 
 
