@@ -189,15 +189,19 @@ class SimpleRobotViewer:
     def _show_status(self):
         """显示状态"""
         try:
-            ee_id = self.model.site_name2id("ee_center_site")
-            ee_pos = self.data.site_xpos[ee_id]
+            # 使用 body 位置代替 site
+            ee_id = self.model.body_name2id("ee_center_body")
+            ee_pos = self.data.xpos[ee_id]
         except Exception:
             ee_pos = np.zeros(3)
 
+        qpos_len = len(self.data.qpos) if hasattr(self.data, 'qpos') else 0
+
         print("-" * 40)
-        print(f"末端执行器位置: x={ee_pos[0]:.3f}, y={ee_pos[1]:.3f}, z={ee_pos[2]:.3f}")
-        print(f"关节角度: {self.data.qpos[:7] if len(self.data.qpos) >= 7 else 'N/A'}")
-        print(f"夹爪开度: {self.data.ctrl[7]:.4f if self.model.nu >= 8 else 'N/A'}")
+        print("末端执行器位置: x=%.3f, y=%.3f, z=%.3f" % (ee_pos[0], ee_pos[1], ee_pos[2]))
+        print("关节角度: %s" % str(self.data.qpos[:7] if qpos_len >= 7 else 'N/A'))
+        if self.model.nu >= 8:
+            print("夹爪开度: %.4f" % self.data.ctrl[7])
         print("-" * 40)
 
 
