@@ -4,10 +4,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import numpy as np
 import os
+import time
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../simulation/mujoco'))
 from ik_solver import IKChain
+
+from backend.api.state import _current_states, RobotState, JointState
 
 router = APIRouter(prefix="/api/ik", tags=["ik"])
 
@@ -111,11 +114,22 @@ async def solve_ik(req: IKSolveRequest):
         final_pos = ik.get_end_effector_position(q_solution)
         error = float(np.linalg.norm(final_pos - target_pos))
 
-        # Build joint list
+        # Build joint list with actual names from IK chain
         joints = [
-            JointSolution(name=f"q{i}", position=float(q))
-            for i, q in enumerate(q_solution)
+            JointSolution(name=name, position=float(q))
+            for name, q in zip(ik.joint_names, q_solution)
         ]
+
+        # Update robot state so Vuer can poll and update 3D view
+        joint_states = [
+            JointState(name=name, position=float(q))
+            for name, q in zip(ik.joint_names, q_solution)
+        ]
+        _current_states[req.robot_id] = RobotState(
+            robot_id=req.robot_id,
+            joints=joint_states,
+            timestamp=time.time()
+        )
 
         return IKSolveResponse(
             status="success",
