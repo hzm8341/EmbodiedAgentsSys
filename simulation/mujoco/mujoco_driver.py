@@ -5,6 +5,7 @@ import numpy as np
 from typing import Optional
 
 from embodiedagentsys.hal.types import ExecutionReceipt, ExecutionStatus
+from simulation.mujoco.arm_ik_controller import ArmIKController
 from simulation.mujoco.robot_model import RobotModel
 from simulation.mujoco.sensors import ForceSensor, ContactSensor
 from simulation.mujoco.config import (
@@ -47,6 +48,28 @@ class MuJoCoDriver:
         self._force_sensor.attach_to_body("base", self._model, self._data)
         self._contact_sensor.attach(self._model, self._data)
 
+        # Initialize Arm IK Controller
+        self._arm_ik_controller = None
+        self._left_joint_ids = []
+        self._right_joint_ids = []
+        if urdf_path:
+            try:
+                self._arm_ik_controller = ArmIKController(urdf_path)
+                # Get joint IDs for left arm (revolute joints only)
+                self._left_joint_ids = [
+                    mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_JOINT, name)
+                    for name in ["left_hand_joint1", "left_hand_joint2", "left_hand_joint3",
+                                "left_hand_joint4", "left_hand_joint5", "left_hand_joint6", "left_hand_joint7"]
+                ]
+                # Get joint IDs for right arm (revolute joints only)
+                self._right_joint_ids = [
+                    mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_JOINT, name)
+                    for name in ["right_hand_joint1", "right_hand_joint2", "right_hand_joint3",
+                                "right_hand_joint4", "right_hand_joint5", "right_hand_joint6", "right_hand_joint7"]
+                ]
+            except Exception as e:
+                print(f"Warning: Failed to initialize ArmIKController: {e}")
+
     def execute_action(self, action_type: str, params: dict) -> ExecutionReceipt:
         """执行动作，返回 ExecutionReceipt
 
@@ -88,6 +111,12 @@ class MuJoCoDriver:
                 return self._release(params)
             elif action_type == "get_scene":
                 return self._get_scene_receipt(params)
+            elif action_type == "move_arm_to":
+                arm = params.get("arm")
+                x = params.get("x", 0.0)
+                y = params.get("y", 0.0)
+                z = params.get("z", 0.0)
+                return self.move_arm_to(arm, x, y, z)
             else:
                 return ExecutionReceipt(
                     action_type=action_type,
@@ -242,7 +271,67 @@ class MuJoCoDriver:
 
     def get_allowed_actions(self) -> list[str]:
         """返回允许的动作白名单"""
-        return ["move_to", "move_relative", "grasp", "release", "get_scene"]
+        return ["move_to", "move_relative", "grasp", "release", "get_scene", "move_arm_to"]
+
+    def move_arm_to(self, arm: str, x: float, y: float, z: float) -> ExecutionReceipt:
+        """移动指定臂的末端到目标位置
+
+        Args:
+            arm: "left" 或 "right"
+            x, y, z: 目标位置（基于基座坐标系）
+
+        Returns:
+            ExecutionReceipt: 执行凭证
+        """
+        if self._arm_ik_controller is None:
+            return ExecutionReceipt(
+                action_type="move_arm_to",
+                params={"arm": arm, "x": x, "y": y, "z": z},
+                status=ExecutionStatus.FAILED,
+                result_message="IK controller not initialized (URDF not loaded)"
+            )
+
+        if arm not in ["left", "right"]:
+            return ExecutionReceipt(
+                action_type="move_arm_to",
+                params={"arm": arm, "x": x, "y": y, "z": z},
+                status=ExecutionStatus.FAILED,
+                result_message=f"Invalid arm: {arm}. Must be 'left' or 'right'"
+            )
+
+        target_pos = np.array([x, y, z])
+
+        # 求解 IK
+        q_solution = self._arm_ik_controller.solve(arm, target_pos)
+        if q_solution is None:
+            return ExecutionReceipt(
+                action_type="move_arm_to",
+                params={"arm": arm, "x": x, "y": y, "z": z},
+                status=ExecutionStatus.FAILED,
+                result_message=f"IK solver failed for arm: {arm}"
+            )
+
+        # 获取关节 ID（只取前7个revolute关节）
+        joint_ids = self._left_joint_ids if arm == "left" else self._right_joint_ids
+
+        # 设置关节角度
+        for i, joint_id in enumerate(joint_ids):
+            self._data.qpos[joint_id] = q_solution[i]
+
+        # 更新仿真
+        mujoco.mj_forward(self._model, self._data)
+
+        # 获取末端实际位置
+        end_effector_name = "Empty_LinkLEND" if arm == "left" else "Empty_LinkREND"
+        actual_pos = self._data.body(end_effector_name).xpos.tolist()
+
+        return ExecutionReceipt(
+            action_type="move_arm_to",
+            params={"arm": arm, "x": x, "y": y, "z": z},
+            status=ExecutionStatus.SUCCESS,
+            result_message=f"Moved {arm} arm to ({x}, {y}, {z})",
+            result_data={"target": [x, y, z], "actual": actual_pos, "joint_angles": q_solution.tolist()[:7]}
+        )
 
     def emergency_stop(self) -> ExecutionReceipt:
         """紧急停止"""
