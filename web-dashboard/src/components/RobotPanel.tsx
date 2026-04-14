@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import URDFViewer from './URDFViewer';
-import ModelTree from './TreeNode';
 
 interface RobotInfo {
   robot_id: string;
@@ -9,7 +8,7 @@ interface RobotInfo {
 }
 
 const RobotPanel: React.FC = () => {
-  const [robots, setRobots] = useState<RobotInfo[]>([]);
+  const [_robots, setRobots] = useState<RobotInfo[]>([]);
   const [selectedRobot, setSelectedRobot] = useState<string>('');
 
   useEffect(() => {
@@ -30,25 +29,8 @@ const RobotPanel: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', height: '100%', gap: '16px', padding: '16px' }}>
-      <div style={{ width: '320px', flexShrink: 0 }}>
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500 }}>Robot:</label>
-          <select
-            value={selectedRobot}
-            onChange={(e) => setSelectedRobot(e.target.value)}
-            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-          >
-            {robots.map(robot => (
-              <option key={robot.robot_id} value={robot.robot_id}>
-                {robot.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        {selectedRobot && <ModelTree robotId={selectedRobot} />}
-      </div>
       <div style={{ flex: 1 }}>
-        <URDFViewer robotId={selectedRobot} vuerPort={8012} />
+        {selectedRobot ? <URDFViewer robotId={selectedRobot} vuerPort={8012} /> : <div style={{ padding: 20, color: '#666' }}>Loading...</div>}
       </div>
     </div>
   );

@@ -117,7 +117,7 @@ const URDFViewer: React.FC<URDFViewerProps> = ({ robotId, vuerPort }) => {
             {/* Tab content */}
             <div className="tab-content" style={{ height: '45%', overflow: 'hidden' }}>
               {activeTab === 'joints' && <JointControl robotId={robotId} />}
-              {activeTab === 'ik' && <IKChatPanel robotId={robotId} vuerPort={vuerPort} />}
+              {activeTab === 'ik' && <IKChatPanel robotId={robotId} />}
             </div>
           </div>
         )}

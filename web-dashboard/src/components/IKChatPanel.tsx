@@ -27,14 +27,12 @@ interface Message {
 
 interface IKChatPanelProps {
   robotId: string;
-  vuerPort: number;
 }
 
-const IKChatPanel: React.FC<IKChatPanelProps> = ({ robotId, vuerPort }) => {
+const IKChatPanel: React.FC<IKChatPanelProps> = ({ robotId }) => {
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [lastResult, setLastResult] = useState<IKResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const parseInput = (text: string): { arm: string; position: Position } | null => {
@@ -120,7 +118,6 @@ const IKChatPanel: React.FC<IKChatPanelProps> = ({ robotId, vuerPort }) => {
       }
 
       const result: IKResult = await response.json();
-      setLastResult(result);
 
       const systemMessage: Message = {
         role: 'system',
@@ -139,7 +136,6 @@ const IKChatPanel: React.FC<IKChatPanelProps> = ({ robotId, vuerPort }) => {
     setMessages([]);
     setInputText('');
     setError(null);
-    setLastResult(null);
   };
 
   return (
