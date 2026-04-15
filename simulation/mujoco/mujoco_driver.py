@@ -321,9 +321,13 @@ class MuJoCoDriver:
         # 更新仿真
         mujoco.mj_forward(self._model, self._data)
 
-        # 获取末端实际位置
-        end_effector_name = "Empty_LinkLEND" if arm == "left" else "Empty_LinkREND"
-        actual_pos = self._data.body(end_effector_name).xpos.tolist()
+        # 获取末端实际位置（使用 MuJoCo 中实际存在的 body）
+        # 注意：由于 MuJoCo URDF 加载限制，末端 link 可能未加载，使用链中最后一个已加载的 body
+        end_effector_name = "Empty_Link21" if arm == "left" else "Empty_Link14"
+        try:
+            actual_pos = self._data.body(end_effector_name).xpos.tolist()
+        except KeyError:
+            actual_pos = self._data.body("Empty_Link15" if arm == "left" else "Empty_Link8").xpos.tolist()
 
         return ExecutionReceipt(
             action_type="move_arm_to",

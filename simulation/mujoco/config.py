@@ -22,6 +22,9 @@ DEFAULT_SCENE = {
     "table_size": (1.0, 1.0),
 }
 
+# URDF 路径配置
+DEFAULT_URDF_PATH = "assets/eyoubot/eu_ca_simple.urdf"
+
 # 传感器参数
 FORCE_SENSOR_SIZE = 6  # Fx, Fy, Fz, Mx, My, Mz
 CONTACT_SENSOR_SIZE = 100  # 最大接触点数
