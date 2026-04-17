@@ -49,3 +49,41 @@ class WebSocketManager:
 
 
 manager = WebSocketManager()
+
+
+class AgentStreamManager:
+    """Broadcast-style WebSocket manager for agent task telemetry.
+
+    All connected clients receive every message. Not tied to robot_id.
+    """
+
+    def __init__(self):
+        self.active_connections: set = set()
+
+    async def connect(self, websocket: WebSocket) -> None:
+        """Accept and register a WebSocket."""
+        await websocket.accept()
+        self.active_connections.add(websocket)
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        """Remove a WebSocket. Safe to call on unknown websocket."""
+        self.active_connections.discard(websocket)
+
+    async def broadcast(self, message: dict) -> None:
+        """Send a JSON message to all connections. Failed connections are dropped."""
+        if not self.active_connections:
+            return
+
+        payload = json.dumps(message)
+        failed = []
+        for ws in list(self.active_connections):
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                failed.append(ws)
+
+        for ws in failed:
+            self.disconnect(ws)
+
+
+agent_stream_manager = AgentStreamManager()
