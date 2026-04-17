@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.api.routes import router as routes_router
-from backend.api import urdf, state, chat, ik
+from backend.api import urdf, state, chat, ik, agent_ws
 
 app = FastAPI(title="LLM Robot Control API")
 
@@ -19,6 +19,7 @@ app.include_router(urdf.router)
 app.include_router(state.router)
 app.include_router(chat.router, prefix="/api")
 app.include_router(ik.router)
+app.include_router(agent_ws.router)
 
 @app.get("/health")
 def health():
