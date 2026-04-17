@@ -19,6 +19,15 @@ def _drain_until_result(ws, timeout_messages: int = 20):
     return collected
 
 
+def test_scenarios_endpoint():
+    r = client.get("/api/agent/scenarios")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 5
+    names = {s["name"] for s in data}
+    assert "single_grasp" in names
+
+
 def test_health_still_works():
     """Regression: existing /health endpoint must still respond."""
     r = client.get("/health")

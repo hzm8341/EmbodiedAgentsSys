@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from agents.core.types import RobotObservation
 from backend.services.agent_bridge import agent_bridge
+from backend.services.scenarios import list_scenarios
 from backend.services.websocket_manager import agent_stream_manager
 
 
@@ -28,6 +29,12 @@ class ExecuteTaskRequest(BaseModel):
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
+
+
+@router.get("/scenarios")
+async def get_scenarios() -> list:
+    """List all predefined debugging scenarios for the frontend catalog."""
+    return list_scenarios()
 
 
 @router.websocket("/ws")
