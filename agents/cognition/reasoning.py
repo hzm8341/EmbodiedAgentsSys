@@ -11,16 +11,16 @@ class ReasoningLayerBase(ABC):
     """推理层抽象基类 - 定义接口契约"""
 
     @abstractmethod
-    async def generate_action(self, plan: dict, observation) -> str:
+    async def generate_action(self, plan: dict, observation) -> dict:
         """
-        生成动作（代码或技能调用）
+        生成动作
 
         Args:
-            plan: 任务计划
+            plan: 任务计划（包含 action_sequence 和 current_step）
             observation: 当前观察
 
         Returns:
-            str: 生成的动作代码或技能调用
+            dict: 动作字典，如 {"action": "move_arm_to", "params": {...}}
         """
         pass
 
@@ -28,27 +28,28 @@ class ReasoningLayerBase(ABC):
 class DefaultReasoningLayer(ReasoningLayerBase):
     """默认推理层实现"""
 
-    async def generate_action(self, plan: dict, observation) -> str:
+    async def generate_action(self, plan: dict, observation) -> dict:
         """
-        生成动作（代码或技能调用）
+        从 plan["action_sequence"] 中取当前步骤的动作。
 
         Args:
-            plan: 任务计划
+            plan: 任务计划（包含 action_sequence 和 current_step）
             observation: 当前观察
 
         Returns:
-            str: 生成的动作代码或技能调用
+            dict: 动作字典，如 {"action": "move_arm_to", "params": {...}}
         """
-        # 最小实现：根据观察状态生成简单的动作代码
-        gripper_state = observation.state.get("gripper_open", True)
+        action_sequence: list = plan.get("action_sequence", [])
+        step: int = plan.get("current_step", 0)
 
-        if gripper_state:
-            action = "gripper.open()"
-        else:
-            action = "gripper.close()"
+        if action_sequence and step < len(action_sequence):
+            action_dict = action_sequence[step]
+            # Advance the step counter in the plan dict for the next call
+            plan["current_step"] = step + 1
+            return action_dict
 
-        # 返回可执行的代码
-        return f"# Generated action for: {plan.get('task', 'unknown')}\n{action}"
+        # Fallback: no-op move when sequence is exhausted or absent
+        return {"action": "move_arm_to", "params": {"arm": "left", "x": 0.3, "y": 0.0, "z": 0.5}}
 
 
 # 保持向后兼容

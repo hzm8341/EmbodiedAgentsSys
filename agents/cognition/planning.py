@@ -27,21 +27,24 @@ class PlanningLayerBase(ABC):
 class DefaultPlanningLayer(PlanningLayerBase):
     """默认规划层实现"""
 
-    async def generate_plan(self, task: str) -> dict:
+    async def generate_plan(self, task: str, action_sequence: list | None = None) -> dict:
         """
         生成任务计划
 
         Args:
             task: 任务描述
+            action_sequence: 可选的预定义动作序列（来自 Scenario）
 
         Returns:
-            dict: 任务计划（包含步骤、目标等）
+            dict: 任务计划（包含步骤、action_sequence 和 current_step）
         """
-        # 最小实现：返回包含任务的基础计划结构
+        seq = action_sequence or []
         return {
             "task": task,
-            "steps": ["step_1", "step_2", "step_3"],
+            "steps": [f"step_{i+1}" for i in range(max(len(seq), 3))],
             "description": f"Plan for task: {task}",
+            "action_sequence": seq,
+            "current_step": 0,
         }
 
 

@@ -8,6 +8,7 @@ class SimulationService:
     """Singleton simulation service"""
     _instance: Optional['SimulationService'] = None
     _driver: Optional[MuJoCoDriver] = None
+    _viewer = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -22,6 +23,30 @@ class SimulationService:
             self._driver = MuJoCoDriver(urdf_path=urdf)
             self._driver.reset()
         return self
+
+    def launch_viewer(self) -> None:
+        """Launch passive MuJoCo viewer and attach to driver."""
+        if self._driver is None:
+            return
+        try:
+            import mujoco.viewer
+            self._viewer = mujoco.viewer.launch_passive(
+                self._driver._model, self._driver._data
+            )
+            self._driver.set_viewer(self._viewer)
+        except Exception as e:
+            print(f"Warning: Could not launch MuJoCo viewer: {e}")
+
+    def close_viewer(self) -> None:
+        """Close the passive viewer if open."""
+        if self._viewer is not None:
+            try:
+                self._viewer.close()
+            except Exception:
+                pass
+            self._viewer = None
+            if self._driver is not None:
+                self._driver.set_viewer(None)
 
     def execute_action(self, action: str, params: dict):
         """Execute action"""

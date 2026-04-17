@@ -1,10 +1,21 @@
 """FastAPI 后端入口 - LLM 机器人控制"""
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.api.routes import router as routes_router
 from backend.api import urdf, state, chat, ik, agent_ws
+from backend.services.simulation import simulation_service
 
-app = FastAPI(title="LLM Robot Control API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    simulation_service.initialize()
+    simulation_service.launch_viewer()
+    yield
+    simulation_service.close_viewer()
+
+
+app = FastAPI(title="LLM Robot Control API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

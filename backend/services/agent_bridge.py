@@ -1,7 +1,9 @@
 """Agent bridge: wraps cognition layers with WebSocket telemetry broadcast."""
 from __future__ import annotations
 
+import asyncio
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional
 
 from agents.cognition.planning import DefaultPlanningLayer
@@ -9,6 +11,8 @@ from agents.cognition.reasoning import DefaultReasoningLayer
 from agents.cognition.learning import DefaultLearningLayer
 from agents.core.types import RobotObservation
 from backend.services.websocket_manager import agent_stream_manager
+
+_sim_executor = ThreadPoolExecutor(max_workers=1)
 
 
 class AgentBridge:
@@ -61,28 +65,49 @@ class AgentBridge:
         self,
         task: str,
         observation: RobotObservation,
-        max_steps: int = 3,
+        action_sequence: list | None = None,
     ) -> dict:
         """Execute task through the four-layer pipeline, broadcasting each step.
 
         Args:
             task: Natural-language task description.
             observation: Initial robot observation.
-            max_steps: How many reason-execute-learn iterations to run.
+            action_sequence: Optional pre-defined action sequence from a Scenario.
 
         Returns:
             The final result payload (same data emitted in the ``result`` message).
         """
+        from backend.services.simulation import simulation_service
+
         await self._emit("task_start", {"task": task})
 
-        plan = await self.planning.generate_plan(task)
+        plan = await self.planning.generate_plan(task, action_sequence=action_sequence)
         await self._emit("planning", {"plan": plan})
+
+        max_steps = len(plan.get("action_sequence", [])) or 3
+        loop = asyncio.get_event_loop()
 
         for step in range(max_steps):
             action = await self.reasoning.generate_action(plan, observation)
             await self._emit("reasoning", {"step": step, "action": action})
 
-            feedback = {"success": True, "step": step}
+            # Run blocking simulation call in dedicated thread
+            try:
+                receipt = await loop.run_in_executor(
+                    _sim_executor,
+                    simulation_service.execute_action,
+                    action.get("action", ""),
+                    action.get("params", {}),
+                )
+                feedback = {
+                    "success": receipt.status.value == "success",
+                    "step": step,
+                    "action": action.get("action"),
+                    "result": receipt.result_message,
+                }
+            except Exception as e:
+                feedback = {"success": False, "step": step, "result": str(e)}
+
             await self._emit("execution", {"step": step, "feedback": feedback})
 
             improved = await self.learning.improve(action, feedback)

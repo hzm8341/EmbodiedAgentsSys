@@ -5,7 +5,7 @@ frontend can launch pre-canned demos with a single click.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List
 
 from agents.core.types import RobotObservation
@@ -19,6 +19,7 @@ class Scenario:
     task: str
     initial_state: Dict[str, float]
     initial_gripper: Dict[str, float]
+    action_sequence: List[dict] = field(default_factory=list)
 
     def build_observation(self) -> RobotObservation:
         """Materialize a RobotObservation from this scenario's initial data."""
@@ -49,6 +50,11 @@ SCENARIOS: Dict[str, Scenario] = {
             "object_blue_block_y": 0.5,
         },
         initial_gripper={"position": 0.04, "force": 0.0},
+        action_sequence=[
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.3, "y": 0.0, "z": 0.6}},
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.5, "y": 0.0, "z": 0.6}},
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.0, "y": 0.5, "z": 0.6}},
+        ],
     ),
     "single_grasp": Scenario(
         name="single_grasp",
@@ -61,6 +67,11 @@ SCENARIOS: Dict[str, Scenario] = {
             "target_z": 0.4,
         },
         initial_gripper={"position": 0.04, "force": 0.0},
+        action_sequence=[
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.4, "y": 0.2, "z": 0.5}},
+            {"action": "grasp", "params": {"arm": "left", "force": 50}},
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.4, "y": 0.2, "z": 0.7}},
+        ],
     ),
     "grasp_and_move": Scenario(
         name="grasp_and_move",
@@ -75,6 +86,11 @@ SCENARIOS: Dict[str, Scenario] = {
             "goal_y": 0.5,
         },
         initial_gripper={"position": 0.04, "force": 0.0},
+        action_sequence=[
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.4, "y": 0.2, "z": 0.5}},
+            {"action": "grasp", "params": {"arm": "left", "force": 50}},
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.1, "y": 0.5, "z": 0.5}},
+        ],
     ),
     "error_recovery": Scenario(
         name="error_recovery",
@@ -88,6 +104,12 @@ SCENARIOS: Dict[str, Scenario] = {
             "fragile": 1.0,
         },
         initial_gripper={"position": 0.04, "force": 0.0},
+        action_sequence=[
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.4, "y": 0.2, "z": 0.5}},
+            {"action": "grasp", "params": {"arm": "left", "force": 20}},
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.4, "y": 0.2, "z": 0.45}},
+            {"action": "grasp", "params": {"arm": "left", "force": 40}},
+        ],
     ),
     "dynamic_environment": Scenario(
         name="dynamic_environment",
@@ -101,6 +123,11 @@ SCENARIOS: Dict[str, Scenario] = {
             "target_moving": 1.0,
         },
         initial_gripper={"position": 0.04, "force": 0.0},
+        action_sequence=[
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.4, "y": 0.2, "z": 0.6}},
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.5, "y": 0.3, "z": 0.6}},
+            {"action": "move_arm_to", "params": {"arm": "left", "x": 0.3, "y": 0.1, "z": 0.5}},
+        ],
     ),
 }
 

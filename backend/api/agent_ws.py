@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from agents.core.types import RobotObservation
 from backend.services.agent_bridge import agent_bridge
-from backend.services.scenarios import list_scenarios
+from backend.services.scenarios import SCENARIOS, list_scenarios
 from backend.services.websocket_manager import agent_stream_manager
 
 
@@ -24,8 +24,8 @@ class ExecuteTaskRequest(BaseModel):
     """Frontend -> backend message to kick off a task."""
     type: str = Field(..., description="Must be 'execute_task'")
     task: str
+    scenario: Optional[str] = None
     observation: ObservationPayload = Field(default_factory=ObservationPayload)
-    max_steps: int = 3
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
@@ -66,15 +66,24 @@ async def agent_websocket(websocket: WebSocket) -> None:
                 }))
                 continue
 
-            observation = RobotObservation(
-                state=dict(request.observation.state),
-                gripper=dict(request.observation.gripper),
-                image=request.observation.image,
-            )
+            # Resolve scenario action_sequence and initial observation
+            scenario = SCENARIOS.get(request.scenario or request.task)
+            action_sequence = scenario.action_sequence if scenario else None
+
+            if scenario and not any(request.observation.state):
+                obs_src = scenario.build_observation()
+                observation = obs_src
+            else:
+                observation = RobotObservation(
+                    state=dict(request.observation.state),
+                    gripper=dict(request.observation.gripper),
+                    image=request.observation.image,
+                )
+
             await agent_bridge.run_with_telemetry(
                 task=request.task,
                 observation=observation,
-                max_steps=request.max_steps,
+                action_sequence=action_sequence,
             )
     except WebSocketDisconnect:
         pass

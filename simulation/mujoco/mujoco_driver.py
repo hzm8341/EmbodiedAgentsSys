@@ -24,6 +24,37 @@ class MuJoCoDriver:
     - 碰撞检测
     """
 
+    _viewer = None  # passive viewer handle (set via set_viewer)
+
+    def set_viewer(self, viewer) -> None:
+        """Attach a passive MuJoCo viewer for live rendering."""
+        self._viewer = viewer
+
+    def _animate_joints(
+        self,
+        joint_ids: list,
+        q_start: "np.ndarray",
+        q_target: "np.ndarray",
+        n_frames: int = 40,
+    ) -> None:
+        """Interpolate joint positions over n_frames and sync viewer each frame.
+
+        If no viewer is attached, performs the instant joint-set (headless safe).
+        """
+        import time as _time
+        for i in range(1, n_frames + 1):
+            alpha = i / n_frames
+            q_interp = q_start + alpha * (q_target - q_start)
+            for idx, jid in enumerate(joint_ids):
+                self._data.qpos[jid] = q_interp[idx]
+            mujoco.mj_forward(self._model, self._data)
+            if self._viewer is not None:
+                try:
+                    self._viewer.sync()
+                except Exception:
+                    pass
+            _time.sleep(1 / 60)
+
     def __init__(
         self,
         urdf_path: Optional[str] = None,
@@ -177,8 +208,13 @@ class MuJoCoDriver:
                 result_message=f"Position out of bounds: x={x}, y={y}, z={z}"
             )
 
-        # 简单位置控制：直接设置位置
-        self._data.body("base").xpos = np.array([x, y, z])
+        # 简单位置控制：直接设置位置（兼容不同 URDF 的根 body 名称）
+        for body_name in ("base", "base_link", "world"):
+            try:
+                self._data.body(body_name).xpos = np.array([x, y, z])
+                break
+            except Exception:
+                continue
         mujoco.mj_forward(self._model, self._data)
 
         return ExecutionReceipt(
@@ -352,12 +388,8 @@ class MuJoCoDriver:
         # 获取关节 ID（只取前7个revolute关节）
         joint_ids = self._left_joint_ids if arm == "left" else self._right_joint_ids
 
-        # 设置关节角度
-        for i, joint_id in enumerate(joint_ids):
-            self._data.qpos[joint_id] = q_solution[i]
-
-        # 更新仿真
-        mujoco.mj_forward(self._model, self._data)
+        # 平滑动画到目标角度
+        self._animate_joints(joint_ids, q_init, q_solution)
 
         # 获取末端实际位置（使用 MuJoCo 中实际存在的 body）
         # 注意：由于 MuJoCo URDF 加载限制，末端 link 可能未加载，使用链中最后一个已加载的 body
