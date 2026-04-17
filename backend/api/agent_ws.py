@@ -66,8 +66,12 @@ async def agent_websocket(websocket: WebSocket) -> None:
                 }))
                 continue
 
-            # Resolve scenario action_sequence and initial observation
-            scenario = SCENARIOS.get(request.scenario or request.task)
+            # Resolve scenario: try explicit name → task as name → task description match
+            scenario = (
+                SCENARIOS.get(request.scenario)
+                or SCENARIOS.get(request.task)
+                or next((s for s in SCENARIOS.values() if s.task == request.task), None)
+            )
             action_sequence = scenario.action_sequence if scenario else None
 
             if scenario and not any(request.observation.state):

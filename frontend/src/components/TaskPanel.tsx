@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Scenario } from "../types";
 
 interface Props {
-  onExecute: (task: string, state: Record<string, number>) => void;
+  onExecute: (task: string, state: Record<string, number>, scenario?: string) => void;
   isExecuting: boolean;
 }
 
@@ -10,6 +10,7 @@ export function TaskPanel({ onExecute, isExecuting }: Props) {
   const [task, setTask] = useState("");
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedScenarioName, setSelectedScenarioName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     fetch("/api/agent/scenarios")
@@ -20,18 +21,20 @@ export function TaskPanel({ onExecute, isExecuting }: Props) {
 
   const handleScenarioClick = (sc: Scenario) => {
     setSelected(sc.name);
+    setSelectedScenarioName(sc.name);
     setTask(sc.task);
   };
 
   const handleExecute = () => {
     if (!task.trim()) return;
     const defaultState = { gripper_open: 1.0 };
-    onExecute(task, defaultState);
+    onExecute(task, defaultState, selectedScenarioName);
   };
 
   const handleReset = () => {
     setTask("");
     setSelected(null);
+    setSelectedScenarioName(undefined);
   };
 
   return (

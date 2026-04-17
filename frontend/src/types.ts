@@ -25,6 +25,7 @@ export interface ObservationState {
 export interface ExecuteTaskRequest {
   type: "execute_task";
   task: string;
+  scenario?: string;
   observation: {
     state: ObservationState;
     gripper?: ObservationState;

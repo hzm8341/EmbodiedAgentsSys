@@ -16,10 +16,10 @@ function App() {
     }
   }, [messages]);
 
-  const handleExecute = (task: string, state: Record<string, number>) => {
+  const handleExecute = (task: string, state: Record<string, number>, scenario?: string) => {
     clearMessages();
     setIsExecuting(true);
-    executeTask(task, state, 3);
+    executeTask(task, state, scenario, 3);
   };
 
   return (

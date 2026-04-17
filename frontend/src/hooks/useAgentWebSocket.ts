@@ -30,7 +30,7 @@ export function useAgentWebSocket(url: string = DEFAULT_WS_URL) {
   }, [url]);
 
   const executeTask = useCallback(
-    (task: string, observationState: Record<string, number>, maxSteps = 3) => {
+    (task: string, observationState: Record<string, number>, scenario?: string, maxSteps = 3) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         console.warn("WebSocket not open");
         return;
@@ -38,6 +38,7 @@ export function useAgentWebSocket(url: string = DEFAULT_WS_URL) {
       const payload: ExecuteTaskRequest = {
         type: "execute_task",
         task,
+        scenario,
         observation: { state: observationState },
         max_steps: maxSteps,
       };
