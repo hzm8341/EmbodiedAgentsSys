@@ -23,7 +23,7 @@ DEFAULT_SCENE = {
 }
 
 # URDF 路径配置
-DEFAULT_URDF_PATH = "assets/eyoubot/eu_ca_simple.urdf"
+DEFAULT_URDF_PATH = "assets/eyoubot/eu_ca_describtion_lbs6.urdf"
 
 # 传感器参数
 FORCE_SENSOR_SIZE = 6  # Fx, Fy, Fz, Mx, My, Mz

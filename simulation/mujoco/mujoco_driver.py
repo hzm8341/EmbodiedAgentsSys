@@ -27,14 +27,17 @@ class MuJoCoDriver:
     def __init__(
         self,
         urdf_path: Optional[str] = None,
+        model_path: Optional[str] = None,
         timestep: float = DEFAULT_TIMESTEP,
     ):
         """
         Args:
-            urdf_path: 机器人 URDF 路径（可选）
+            urdf_path: 机器人 URDF 路径，用于 IK 求解（可选）
+            model_path: MuJoCo MJCF XML 路径，用于仿真显示（可选，优先于 urdf_path）
             timestep: 仿真时间步
         """
-        self._robot = RobotModel(urdf_path=urdf_path)
+        sim_path = model_path or urdf_path
+        self._robot = RobotModel(urdf_path=sim_path)
         self._force_sensor = ForceSensor()
         self._contact_sensor = ContactSensor()
         self._emergency_stopped = False
@@ -44,17 +47,25 @@ class MuJoCoDriver:
         self._model = self._robot.get_model()
         self._data = self._robot.get_data()
 
-        # 关联传感器
-        self._force_sensor.attach_to_body("base", self._model, self._data)
+        # 关联传感器（body "base" 可能不存在于 XML 中，跳过错误）
+        try:
+            self._force_sensor.attach_to_body("base", self._model, self._data)
+        except Exception:
+            pass
         self._contact_sensor.attach(self._model, self._data)
 
-        # Initialize Arm IK Controller
+        # 检测末端执行器 body 名称（MJCF 用 ra_end/la_end，URDF 用 Empty_LinkLEND/REND）
+        self._left_ee_name = self._detect_body("Empty_LinkLEND", "la_end", "Empty_Link21", "la_sensor")
+        self._right_ee_name = self._detect_body("Empty_LinkREND", "ra_end", "Empty_Link14", "ra_sensor")
+
+        # Initialize Arm IK Controller (使用 URDF，即使仿真用 XML)
+        ik_path = urdf_path
         self._arm_ik_controller = None
         self._left_joint_ids = []
         self._right_joint_ids = []
-        if urdf_path:
+        if ik_path:
             try:
-                self._arm_ik_controller = ArmIKController(urdf_path)
+                self._arm_ik_controller = ArmIKController(ik_path)
                 # Get joint IDs for left arm (revolute joints only)
                 self._left_joint_ids = [
                     mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_JOINT, name)
@@ -69,6 +80,25 @@ class MuJoCoDriver:
                 ]
             except Exception as e:
                 print(f"Warning: Failed to initialize ArmIKController: {e}")
+
+    def _detect_body(self, *candidates: str) -> str:
+        """返回模型中存在的第一个 body 名称"""
+        for name in candidates:
+            try:
+                bid = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, name)
+                if bid >= 0:
+                    return name
+            except Exception:
+                pass
+        return candidates[-1]
+
+    def reset_to_home(self) -> None:
+        """将机器人重置到 home 姿态（读取模型 keyframe[0]，若无则用零位）"""
+        if self._model.nkey > 0:
+            mujoco.mj_resetDataKeyframe(self._model, self._data, 0)
+        else:
+            mujoco.mj_resetData(self._model, self._data)
+        mujoco.mj_forward(self._model, self._data)
 
     def execute_action(self, action_type: str, params: dict) -> ExecutionReceipt:
         """执行动作，返回 ExecutionReceipt
@@ -263,8 +293,12 @@ class MuJoCoDriver:
 
     def get_scene(self) -> dict:
         """获取当前场景状态"""
+        try:
+            robot_pos = self._data.body(self._left_ee_name).xpos.tolist()
+        except Exception:
+            robot_pos = [0, 0, 0]
         return {
-            "robot_position": self._data.body("base").xpos.tolist() if self._data else [0, 0, 0],
+            "robot_position": robot_pos,
             "grasped_object": self._grasped_object,
             "contacts": len(self._contact_sensor.get_contacts()),
         }
@@ -301,8 +335,12 @@ class MuJoCoDriver:
 
         target_pos = np.array([x, y, z])
 
+        # 获取当前关节位置作为 IK 初始值
+        joint_ids = self._left_joint_ids if arm == "left" else self._right_joint_ids
+        q_init = np.array([self._data.qpos[jid] for jid in joint_ids])
+
         # 求解 IK
-        q_solution = self._arm_ik_controller.solve(arm, target_pos)
+        q_solution = self._arm_ik_controller.solve(arm, target_pos, q_init=q_init)
         if q_solution is None:
             return ExecutionReceipt(
                 action_type="move_arm_to",
@@ -323,11 +361,11 @@ class MuJoCoDriver:
 
         # 获取末端实际位置（使用 MuJoCo 中实际存在的 body）
         # 注意：由于 MuJoCo URDF 加载限制，末端 link 可能未加载，使用链中最后一个已加载的 body
-        end_effector_name = "Empty_Link21" if arm == "left" else "Empty_Link14"
+        ee_name = self._left_ee_name if arm == "left" else self._right_ee_name
         try:
-            actual_pos = self._data.body(end_effector_name).xpos.tolist()
-        except KeyError:
-            actual_pos = self._data.body("Empty_Link15" if arm == "left" else "Empty_Link8").xpos.tolist()
+            actual_pos = self._data.body(ee_name).xpos.tolist()
+        except Exception:
+            actual_pos = list(target_pos)
 
         return ExecutionReceipt(
             action_type="move_arm_to",
@@ -351,7 +389,7 @@ class MuJoCoDriver:
     def reset(self) -> None:
         """重置驱动状态"""
         self._emergency_stopped = False
-        mujoco.mj_resetData(self._model, self._data)
+        self.reset_to_home()
 
     def get_force_feedback(self) -> dict:
         """获取力觉反馈"""

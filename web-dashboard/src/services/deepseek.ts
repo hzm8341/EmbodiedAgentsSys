@@ -29,16 +29,17 @@ export const ROBOT_TOOLS = [
   {
     type: "function" as const,
     function: {
-      name: "move_to",
-      description: "将机器人末端移动到指定的三维位置",
+      name: "move_arm_to",
+      description: "将机器人指定臂的末端移动到目标位置（基于基座坐标系）",
       parameters: {
         type: "object",
         properties: {
-          x: { type: "number", description: "X坐标 (米)" },
-          y: { type: "number", description: "Y坐标 (米)" },
-          z: { type: "number", description: "Z坐标 (米)" }
+          arm: { type: "string", enum: ["left", "right"], description: "臂名称：left 或 right" },
+          x: { type: "number", description: "X坐标 (米，相对于基座)" },
+          y: { type: "number", description: "Y坐标 (米，相对于基座)" },
+          z: { type: "number", description: "Z坐标 (米，相对于基座)" }
         },
-        required: ["x", "y", "z"]
+        required: ["arm", "x", "y", "z"]
       }
     }
   },

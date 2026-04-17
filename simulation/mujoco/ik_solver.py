@@ -61,14 +61,17 @@ class IKChain:
 
             self.joint_types[name] = jtype
 
+            # Only process revolute joints for IK (skip fixed joints)
+            if jtype != 'revolute':
+                continue
+
             # Joint limits
-            if jtype in ['revolute', 'prismatic']:
-                limit = joint.find('limit')
-                if limit is not None:
-                    self.joint_limits[name] = (
-                        float(limit.get('lower', '-3.14159')),
-                        float(limit.get('upper', '3.14159'))
-                    )
+            limit = joint.find('limit')
+            if limit is not None:
+                self.joint_limits[name] = (
+                    float(limit.get('lower', '-3.14159')),
+                    float(limit.get('upper', '3.14159'))
+                )
 
             # Axis
             axis_elem = joint.find('axis')
@@ -107,7 +110,8 @@ class IKChain:
 
         path = self._find_path(root, self.end_effector_link)
         if path:
-            self.joint_names = path
+            # Filter to only include revolute joints (for MuJoCo compatibility)
+            self.joint_names = [j for j in path if self.joint_types.get(j) == 'revolute']
             self._nq = len(self.joint_names)
         else:
             print(f"Warning: Could not find path from root to {self.end_effector_link}")

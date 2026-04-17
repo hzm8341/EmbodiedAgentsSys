@@ -7,12 +7,14 @@ export const SettingsPanel = () => {
     model,
     websocketUrl,
     apiUrl,
+    apiKey,
     refreshRate,
     setLanguage,
     setTheme,
     setModel,
     setWebsocketUrl,
     setApiUrl,
+    setApiKey,
     setRefreshRate,
   } = useSettingsStore()
 
@@ -78,6 +80,17 @@ export const SettingsPanel = () => {
             type="text"
             value={apiUrl}
             onChange={(e) => setApiUrl(e.target.value)}
+            className="w-full px-3 py-2 border rounded dark:bg-gray-800 dark:border-gray-700"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">DeepSeek API Key</label>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="sk-xxxxxxxxxxxxxx"
             className="w-full px-3 py-2 border rounded dark:bg-gray-800 dark:border-gray-700"
           />
         </div>

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useChatStore } from '../store/useChatStore'
+import { useSettingsStore } from '../store/useSettingsStore'
 
 export const ChatPanel = () => {
   const { messages, isTyping, addMessage, setTyping } = useChatStore()
@@ -17,6 +18,12 @@ export const ChatPanel = () => {
   const handleSend = async () => {
     if (!inputValue.trim()) return
 
+    const { apiKey } = useSettingsStore.getState()
+    if (!apiKey) {
+      addMessage('assistant', '请先在设置中配置 DeepSeek API Key')
+      return
+    }
+
     addMessage('user', inputValue)
     setInputValue('')
     setTyping(true)
@@ -24,7 +31,10 @@ export const ChatPanel = () => {
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
         body: JSON.stringify({ message: inputValue }),
       })
       const data = await response.json()
