@@ -10,12 +10,12 @@ allowed_actions:
         type: list
         length: 3
         description: "Target position [x, y, z]"
+    optional_params:
       speed:
         type: float
         min: 0.01
         max: 1.0
         description: "Movement speed (0.01 to 1.0 m/s)"
-    optional_params:
       approach:
         type: enum
         values: ["linear", "cartesian", "joint"]
@@ -30,13 +30,13 @@ allowed_actions:
   gripper_close:
     description: "Close robot gripper with specified force"
     dangerous: false
-    required_params:
+    required_params: {}
+    optional_params:
       force:
         type: float
         min: 0
         max: 100
         description: "Grip force (0 to 100 N)"
-    optional_params: {}
 
   vision_capture:
     description: "Capture image from robot camera"

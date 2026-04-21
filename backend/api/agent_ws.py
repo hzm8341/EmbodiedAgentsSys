@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from agents.core.types import RobotObservation
 from backend.services.agent_bridge import agent_bridge
 from backend.services.scenarios import SCENARIOS, list_scenarios
+from backend.services.simulation import simulation_service
 from backend.services.websocket_manager import agent_stream_manager
 
 
@@ -26,6 +27,7 @@ class ExecuteTaskRequest(BaseModel):
     task: str
     scenario: Optional[str] = None
     observation: ObservationPayload = Field(default_factory=ObservationPayload)
+    max_steps: Optional[int] = None
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
@@ -51,6 +53,24 @@ async def agent_websocket(websocket: WebSocket) -> None:
             raw = await websocket.receive_text()
             try:
                 payload = json.loads(raw)
+            except Exception as e:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "data": {"message": f"invalid JSON: {e}"},
+                }))
+                continue
+
+            msg_type = payload.get("type", "")
+
+            if msg_type == "reset_to_home":
+                result = simulation_service.reset_to_home()
+                await websocket.send_text(json.dumps({
+                    "type": "reset_complete",
+                    "data": result,
+                }))
+                continue
+
+            try:
                 request = ExecuteTaskRequest(**payload)
             except Exception as e:
                 await websocket.send_text(json.dumps({
@@ -88,6 +108,7 @@ async def agent_websocket(websocket: WebSocket) -> None:
                 task=request.task,
                 observation=observation,
                 action_sequence=action_sequence,
+                max_steps=request.max_steps,
             )
     except WebSocketDisconnect:
         pass

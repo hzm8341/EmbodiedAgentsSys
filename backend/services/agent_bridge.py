@@ -66,6 +66,7 @@ class AgentBridge:
         task: str,
         observation: RobotObservation,
         action_sequence: list | None = None,
+        max_steps: int | None = None,
     ) -> dict:
         """Execute task through the four-layer pipeline, broadcasting each step.
 
@@ -73,6 +74,8 @@ class AgentBridge:
             task: Natural-language task description.
             observation: Initial robot observation.
             action_sequence: Optional pre-defined action sequence from a Scenario.
+            max_steps: Override the number of reasoning loops (default: len of
+                action_sequence, or 3 if no sequence is provided).
 
         Returns:
             The final result payload (same data emitted in the ``result`` message).
@@ -84,7 +87,7 @@ class AgentBridge:
         plan = await self.planning.generate_plan(task, action_sequence=action_sequence)
         await self._emit("planning", {"plan": plan})
 
-        max_steps = len(plan.get("action_sequence", [])) or 3
+        max_steps = max_steps if max_steps is not None else (len(plan.get("action_sequence", [])) or 3)
         loop = asyncio.get_event_loop()
 
         for step in range(max_steps):

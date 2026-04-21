@@ -61,8 +61,8 @@ class ExecutionConfirmationEngine:
         """
         # Check timeout
         if feedbacks and len(feedbacks) >= 2:
-            duration = feedbacks[-1].timestamp - feedbacks[0].timestamp
-            duration_seconds = duration.total_seconds()
+            _delta = feedbacks[-1].timestamp - feedbacks[0].timestamp
+            duration_seconds = _delta.total_seconds() if hasattr(_delta, "total_seconds") else float(_delta)
             if duration_seconds > timeout_seconds:
                 return ConfirmationResult(
                     status="timeout",
@@ -131,7 +131,11 @@ class ExecutionConfirmationEngine:
         Returns:
             ConfirmationResult for grasp check
         """
-        gripper_holding = actual_state.get("gripper_holding", False)
+        gripper_holding = (
+            actual_state.get("gripper_holding", False)
+            or actual_state.get("object_grasped", False)
+            or actual_state.get("gripper_state") == "closed"
+        )
         if gripper_holding:
             return ConfirmationResult(
                 status="confirmed", reason="object grasped"

@@ -115,7 +115,7 @@ async def test_task_planner_with_skills():
     planner = TaskPlanner(strategy=PlanningStrategy.RULE_BASED)
 
     # 规划任务
-    task = planner.plan("抓取杯子放到桌子上")
+    task = await planner.plan("抓取杯子放到桌子上")
 
     # 验证技能序列
     assert "reach" in task.skills

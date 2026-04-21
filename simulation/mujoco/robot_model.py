@@ -1,5 +1,6 @@
 """机器人模型加载器"""
 
+import os
 import mujoco
 import numpy as np
 from pathlib import Path
@@ -37,11 +38,14 @@ class RobotModel:
             FileNotFoundError: 如果文件不存在
             RuntimeError: 如果加载失败
         """
-        if not Path(urdf_path).exists():
+        abs_path = Path(urdf_path).resolve()
+        if not abs_path.exists():
             raise FileNotFoundError(f"URDF not found: {urdf_path}")
 
+        old_cwd = os.getcwd()
         try:
-            self._model = mujoco.MjModel.from_xml_path(urdf_path)
+            os.chdir(abs_path.parent)
+            self._model = mujoco.MjModel.from_xml_path(str(abs_path))
             self._data = mujoco.MjData(self._model)
             self._joint_names = [
                 mujoco.mj_id2name(self._model, mujoco.mjtObj.mjOBJ_JOINT, i)
@@ -50,6 +54,8 @@ class RobotModel:
             ]
         except Exception as e:
             raise RuntimeError(f"Failed to load URDF: {e}") from e
+        finally:
+            os.chdir(old_cwd)
 
     def _create_empty_robot(self) -> None:
         """创建空载（用于测试）"""

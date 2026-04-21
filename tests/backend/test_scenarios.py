@@ -56,17 +56,21 @@ def test_list_scenarios_is_json_safe():
         assert all(isinstance(v, str) for v in entry.values())
 
 
-def test_grasp_and_move_mentions_target_and_goal():
+def test_grasp_and_move_mentions_target():
     sc = get_scenario("grasp_and_move")
-    assert "goal_x" in sc.initial_state
     assert "target_x" in sc.initial_state
+    assert sc.initial_state["target_x"] == pytest.approx(0.45)
 
 
-def test_dynamic_environment_marks_movement():
+def test_dynamic_environment_has_target():
     sc = get_scenario("dynamic_environment")
-    assert sc.initial_state.get("target_moving") == 1.0
+    assert "target_x" in sc.initial_state
+    # action_sequence must include at least one grasp step
+    actions = [s["action"] for s in sc.action_sequence]
+    assert "grasp" in actions
 
 
-def test_error_recovery_marks_fragile():
+def test_error_recovery_has_multiple_grasp_attempts():
     sc = get_scenario("error_recovery")
-    assert sc.initial_state.get("fragile") == 1.0
+    grasp_count = sum(1 for s in sc.action_sequence if s["action"] == "grasp")
+    assert grasp_count >= 2, f"expected ≥2 grasp attempts, got {grasp_count}"

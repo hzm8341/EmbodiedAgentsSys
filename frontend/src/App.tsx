@@ -1,52 +1,20 @@
-import { useEffect, useState } from "react";
-import { TaskPanel } from "./components/TaskPanel";
-import { ExecutionMonitor } from "./components/ExecutionMonitor";
-import { ObservationPanel } from "./components/ObservationPanel";
-import { ResultPanel } from "./components/ResultPanel";
-import { useAgentWebSocket } from "./hooks/useAgentWebSocket";
+import { useState } from 'react'
+import { Header } from './components/Header'
+import { Sidebar, type SidebarItem } from './components/Sidebar'
+import { MainArea } from './components/MainArea'
 
 function App() {
-  const { isConnected, messages, executeTask, clearMessages } =
-    useAgentWebSocket();
-  const [isExecuting, setIsExecuting] = useState(false);
-
-  useEffect(() => {
-    if (messages.some((m) => m.type === "result")) {
-      setIsExecuting(false);
-    }
-  }, [messages]);
-
-  const handleExecute = (task: string, state: Record<string, number>, scenario?: string) => {
-    clearMessages();
-    setIsExecuting(true);
-    executeTask(task, state, scenario, 3);
-  };
+  const [active, setActive] = useState<SidebarItem>('agent')
 
   return (
-    <div className="app-root">
-      <header className="app-header">
-        <h1>Embodied Agents — Interactive Debugger</h1>
-        <span
-          className={`connection-badge ${
-            isConnected ? "connected" : "disconnected"
-          }`}
-        >
-          {isConnected ? "● Connected" : "● Disconnected"}
-        </span>
-      </header>
-
-      <div className="app-grid">
-        <div className="col-left">
-          <TaskPanel onExecute={handleExecute} isExecuting={isExecuting} />
-          <ObservationPanel messages={messages} />
-        </div>
-        <div className="col-right">
-          <ExecutionMonitor messages={messages} isExecuting={isExecuting} />
-          <ResultPanel messages={messages} />
-        </div>
+    <div className="h-screen flex flex-col bg-gray-100">
+      <Header />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar active={active} onSelect={setActive} />
+        <MainArea active={active} />
       </div>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App

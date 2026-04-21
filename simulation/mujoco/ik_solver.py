@@ -11,6 +11,10 @@ class IKChain:
 
     Parses URDF manually to build kinematics chain and compute
     forward kinematics and Jacobian without MuJoCo model loading.
+
+    FK uses ALL joints in the path (fixed + revolute) so that the
+    target position is expressed in the same world frame as MuJoCo.
+    Only revolute joints are IK degrees of freedom.
     """
 
     def __init__(self, urdf_path: str, end_effector_link: str):
@@ -39,6 +43,9 @@ class IKChain:
         self.joint_types: Dict[str, str] = {}
         self.link_xyz: Dict[str, np.ndarray] = {}
 
+        # All joints in the path root→EE (used for FK, includes fixed joints)
+        self._all_path_joints: List[str] = []
+        # Only revolute joints (IK degrees of freedom)
         self.joint_names: List[str] = []
         self._nq: int = 0
 
@@ -47,10 +54,9 @@ class IKChain:
 
     def _parse_urdf(self):
         """Parse URDF and extract joint/link information."""
-        # Build parent/child maps and extract joint data
         for joint in self.root.findall('joint'):
             name = joint.get('name')
-            jtype = joint.get('type')
+            jtype = joint.get('type', 'fixed')
 
             parent = joint.find('parent')
             child = joint.find('child')
@@ -61,27 +67,7 @@ class IKChain:
 
             self.joint_types[name] = jtype
 
-            # Only process revolute joints for IK (skip fixed joints)
-            if jtype != 'revolute':
-                continue
-
-            # Joint limits
-            limit = joint.find('limit')
-            if limit is not None:
-                self.joint_limits[name] = (
-                    float(limit.get('lower', '-3.14159')),
-                    float(limit.get('upper', '3.14159'))
-                )
-
-            # Axis
-            axis_elem = joint.find('axis')
-            if axis_elem is not None:
-                axis_str = axis_elem.get('xyz', '1 0 0')
-                self.joint_axis[name] = np.array([float(x) for x in axis_str.split()])
-            else:
-                self.joint_axis[name] = np.array([1., 0., 0.])
-
-            # Origin
+            # Parse origin for ALL joint types (fixed joints carry structural offsets)
             origin = joint.find('origin')
             if origin is not None:
                 xyz_str = origin.get('xyz', '0 0 0')
@@ -92,7 +78,22 @@ class IKChain:
                 self.joint_origin_xyz[name] = np.array([0., 0., 0.])
                 self.joint_origin_rpy[name] = np.array([0., 0., 0.])
 
-        # Extract link positions (for FK)
+            # Revolute-only properties
+            if jtype == 'revolute':
+                limit = joint.find('limit')
+                if limit is not None:
+                    self.joint_limits[name] = (
+                        float(limit.get('lower', '-3.14159')),
+                        float(limit.get('upper', '3.14159'))
+                    )
+                axis_elem = joint.find('axis')
+                if axis_elem is not None:
+                    axis_str = axis_elem.get('xyz', '1 0 0')
+                    self.joint_axis[name] = np.array([float(x) for x in axis_str.split()])
+                else:
+                    self.joint_axis[name] = np.array([1., 0., 0.])
+
+        # Extract link positions (for reference)
         for link in self.root.findall('link'):
             name = link.get('name')
             visual = link.find('visual')
@@ -110,7 +111,9 @@ class IKChain:
 
         path = self._find_path(root, self.end_effector_link)
         if path:
-            # Filter to only include revolute joints (for MuJoCo compatibility)
+            # All joints for FK (fixed joints contribute structural translations)
+            self._all_path_joints = path
+            # Only revolute joints are IK degrees of freedom
             self.joint_names = [j for j in path if self.joint_types.get(j) == 'revolute']
             self._nq = len(self.joint_names)
         else:
@@ -152,6 +155,17 @@ class IKChain:
     def njnt(self) -> int:
         return len(self.joint_names)
 
+    def _q_val_for_joint(self, joint_name: str, q: np.ndarray) -> float:
+        """Return the q value for a joint; 0.0 for non-revolute joints."""
+        jtype = self.joint_types.get(joint_name, 'fixed')
+        if jtype == 'revolute':
+            try:
+                idx = self.joint_names.index(joint_name)
+                return float(q[idx]) if idx < len(q) else 0.0
+            except ValueError:
+                return 0.0
+        return 0.0
+
     def get_jacobian(self, q: np.ndarray) -> np.ndarray:
         """Compute 3xN geometric Jacobian for end effector."""
         n = len(self.joint_names)
@@ -174,14 +188,15 @@ class IKChain:
         return J
 
     def get_end_effector_position(self, q: np.ndarray) -> np.ndarray:
-        """Compute end effector world position via FK."""
-        if not self.joint_names:
+        """Compute end effector world position via FK over ALL path joints."""
+        if not self._all_path_joints:
             return np.array([0.0, 0.0, 0.0])
 
         pos = np.array([0.0, 0.0, 0.0])
         orientation = np.eye(3)
 
-        for joint_name, q_val in zip(self.joint_names, q):
+        for joint_name in self._all_path_joints:
+            q_val = self._q_val_for_joint(joint_name, q)
             T = self._get_joint_transform(q_val, joint_name)
             pos = pos + orientation @ T[:3, 3]
             orientation = orientation @ T[:3, :3]
@@ -198,7 +213,7 @@ class IKChain:
         if joint_name in self.joint_origin_rpy:
             T[:3, :3] = self._rpy_to_rot(self.joint_origin_rpy[joint_name])
 
-        jtype = self.joint_types.get(joint_name, 'revolute')
+        jtype = self.joint_types.get(joint_name, 'fixed')
         axis = self.joint_axis.get(joint_name, np.array([1., 0., 0.]))
 
         if jtype == 'revolute':
@@ -208,28 +223,31 @@ class IKChain:
             T[:3, :3] = T[:3, :3] @ R
         elif jtype == 'prismatic':
             T[:3, 3] = T[:3, 3] + axis * q
+        # fixed joints: only origin offset applied (already set above)
 
         return T
 
     def _get_joint_position_world(self, q: np.ndarray, joint_name: str) -> np.ndarray:
-        """Get world position of joint."""
+        """Get world position of a revolute joint (position before that joint's rotation)."""
         pos = np.array([0.0, 0.0, 0.0])
         orientation = np.eye(3)
 
-        for jname, qval in zip(self.joint_names, q):
+        for jname in self._all_path_joints:
             if jname == joint_name:
                 return pos
-            T = self._get_joint_transform(qval, jname)
+            q_val = self._q_val_for_joint(jname, q)
+            T = self._get_joint_transform(q_val, jname)
             pos = pos + orientation @ T[:3, 3]
             orientation = orientation @ T[:3, :3]
 
         return pos
 
     def _get_joint_rotation_world(self, q: np.ndarray, joint_name: str) -> np.ndarray:
-        """Get rotation matrix of joint in world frame."""
+        """Get rotation matrix of a joint in world frame."""
         R = np.eye(3)
-        for jname, qval in zip(self.joint_names, q):
-            T = self._get_joint_transform(qval, jname)
+        for jname in self._all_path_joints:
+            q_val = self._q_val_for_joint(jname, q)
+            T = self._get_joint_transform(q_val, jname)
             R = R @ T[:3, :3]
             if jname == joint_name:
                 return R

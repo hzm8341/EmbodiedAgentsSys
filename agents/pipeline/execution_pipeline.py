@@ -275,7 +275,7 @@ class ExecutionPipeline:
         # Get tool
         tool = tools_registry.get(action.action_type.value)
         if not tool:
-            result.error_reason = f"no tool registered for {action.action_type.value}"
+            result.error_reason = f"tool not found: no tool registered for {action.action_type.value}"
 
             # Log tool not found
             self.audit_trail.log_event(
@@ -298,6 +298,7 @@ class ExecutionPipeline:
                 action_type=action.action_type.value,
                 details={
                     "action_id": action_id,
+                    "action_type": action.action_type.value,
                     "params": action.params,
                 },
             )
@@ -324,11 +325,26 @@ class ExecutionPipeline:
 
             result.timestamp_end = datetime.now(timezone.utc)
 
+            # If any feedback reported an error, skip confirmation and fail immediately
+            if result.error_reason:
+                self.audit_trail.log_event(
+                    ExecutionLog(
+                        event_type="execution_failed",
+                        action_type=action.action_type.value,
+                        details={"action_id": action_id, "reason": result.error_reason},
+                    )
+                )
+                return result
+
             # Step 4: Confirm execution result
+            # Use the last feedback's current_state if available (reflects post-execution state)
+            last_state = robot_state
+            if result.feedbacks and result.feedbacks[-1].current_state:
+                last_state = {**robot_state, **result.feedbacks[-1].current_state}
             confirmation = await self.confirmation_engine.confirm(
                 action,
                 result.feedbacks,
-                robot_state,
+                last_state,
             )
             result.confirmation = confirmation
 

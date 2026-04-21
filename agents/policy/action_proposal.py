@@ -54,6 +54,8 @@ class Action:
             self.action_type = ActionType(self.action_type)
         if isinstance(self.expected_outcome, str):
             self.expected_outcome = ExpectedOutcomeType(self.expected_outcome)
+        if not isinstance(self.params, dict):
+            raise TypeError(f"params must be a dict, got {type(self.params).__name__}")
 
 
 @dataclass

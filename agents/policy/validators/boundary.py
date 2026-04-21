@@ -91,7 +91,7 @@ class BoundaryChecker(Validator):
         return ValidationResult(
             valid=True,
             reason=f"Action '{action.action_type.value}' does not require boundary checking",
-            validator="BoundaryChecker",
+            validator="boundary",
         )
 
     def _check_pose(self, pose: List[float]) -> ValidationResult:
@@ -107,7 +107,7 @@ class BoundaryChecker(Validator):
             return ValidationResult(
                 valid=False,
                 reason=f"Pose must be a list/tuple of 3 elements, got {len(pose) if isinstance(pose, (list, tuple)) else 'non-sequence'}",
-                validator="BoundaryChecker",
+                validator="boundary",
             )
 
         workspace = self.safety_limits.get("workspace", {})
@@ -126,20 +126,20 @@ class BoundaryChecker(Validator):
                 return ValidationResult(
                     valid=False,
                     reason=f"Workspace boundary violation: {axis_name}={value} is below minimum {min_val}",
-                    validator="BoundaryChecker",
+                    validator="boundary",
                 )
 
             if max_val is not None and value > max_val:
                 return ValidationResult(
                     valid=False,
                     reason=f"Workspace boundary violation: {axis_name}={value} exceeds maximum {max_val}",
-                    validator="BoundaryChecker",
+                    validator="boundary",
                 )
 
         return ValidationResult(
             valid=True,
             reason=f"Pose {pose} is within workspace boundaries",
-            validator="BoundaryChecker",
+            validator="boundary",
         )
 
     def _check_gripper_force(self, force: float) -> ValidationResult:
@@ -155,7 +155,7 @@ class BoundaryChecker(Validator):
             return ValidationResult(
                 valid=False,
                 reason=f"Force must be a number, got {type(force).__name__}",
-                validator="BoundaryChecker",
+                validator="boundary",
             )
 
         gripper_limits = self.safety_limits.get("gripper_limits", {})
@@ -166,18 +166,18 @@ class BoundaryChecker(Validator):
             return ValidationResult(
                 valid=False,
                 reason=f"Gripper force {force}N is below minimum {min_force}N",
-                validator="BoundaryChecker",
+                validator="boundary",
             )
 
         if force > max_force:
             return ValidationResult(
                 valid=False,
                 reason=f"Gripper force {force}N exceeds maximum {max_force}N",
-                validator="BoundaryChecker",
+                validator="boundary",
             )
 
         return ValidationResult(
             valid=True,
             reason=f"Gripper force {force}N is within limits [{min_force}N, {max_force}N]",
-            validator="BoundaryChecker",
+            validator="boundary",
         )

@@ -38,7 +38,7 @@ class TaskPlan:
     @property
     def skills(self) -> set:
         """返回计划中涉及的技能名称集合（pick 映射为 grasp）。"""
-        _map = {"pick": "grasp", "place": "place", "go_to": "navigate", "inspect": "inspect"}
+        _map = {"pick": "grasp", "place": "place", "go_to": "reach", "inspect": "inspect"}
         return {_map.get(a.action, a.action) for a in self.actions}
 
 
@@ -97,7 +97,9 @@ class TaskPlanner:
         self.robot_memory = robot_memory
         self.history_file = history_file
 
-        if backend == "ollama":
+        if strategy == PlanningStrategy.RULE_BASED:
+            self._backend = "mock"
+        elif backend == "ollama":
             self._init_ollama()
 
     def _init_ollama(self) -> None:
@@ -249,6 +251,7 @@ class TaskPlanner:
         """Mock 规划器，用于测试。根据指令关键词生成简单计划。"""
         actions = []
         if any(kw in instruction for kw in ["抓", "拿", "取", "grasp", "pick"]):
+            actions.append(TaskAction(action="go_to", target="target", location="source"))
             actions.append(TaskAction(action="pick", target="target", location="source"))
         if any(kw in instruction for kw in ["放", "置", "place", "put"]):
             actions.append(TaskAction(action="place", target="target", location="destination"))

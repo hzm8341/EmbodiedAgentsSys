@@ -93,10 +93,12 @@ class TwoLevelValidationPipeline:
 
         # Track whether any action requires human approval
         requires_approval = False
+        last_validator = "pipeline"
 
         # Validate each action in sequence (fail-fast)
         for action in proposal.action_sequence:
             result = await self._validate_single_action(action, robot_state)
+            last_validator = result.validator
 
             # Fail-fast: return immediately on first error
             if not result.valid:
@@ -110,7 +112,7 @@ class TwoLevelValidationPipeline:
         return ValidationResult(
             valid=True,
             reason="All actions passed validation",
-            validator="pipeline",
+            validator=last_validator,
             requires_human_approval=requires_approval,
         )
 
@@ -142,10 +144,12 @@ class TwoLevelValidationPipeline:
 
         # Track if any validator marks for approval (don't fail on approval)
         requires_approval = False
+        last_validator_name = "pipeline"
 
         # Run all validators in priority order (fail-fast)
         for validator in all_validators:
             result = await validator.validate_action(action, robot_state)
+            last_validator_name = result.validator
 
             # Fail-fast: return immediately on validation error
             if not result.valid:
@@ -159,6 +163,6 @@ class TwoLevelValidationPipeline:
         return ValidationResult(
             valid=True,
             reason="Action passed all validators",
-            validator="pipeline",
+            validator=last_validator_name,
             requires_human_approval=requires_approval,
         )
