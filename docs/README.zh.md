@@ -44,6 +44,42 @@
 
 ---
 
+## v2.1.0 新功能 (2026-04-21)
+
+### 🚀 MuJoCo 实时仿真
+- **集成 MuJoCo viewer** 用于实时机器人仿真
+- 场景构建器：机器人模型、物体、灯光、地板
+- IK（逆运动学）求解器用于轨迹规划
+- 力传感器和接触传感器用于抓取检测
+- 支持可抓取物体（球、立方体、圆柱、盒子）
+
+### 🎨 前端架构重构
+- **组件化设计** 使用 React + TypeScript + Tailwind CSS
+- **Zustand 状态管理** 用于聊天、设置和状态
+- **WebSocket 实时通信** 与后端智能体连接
+- 新 UI 组件：
+  - `AgentPanel` - 智能体控制与状态
+  - `CameraPanel` - 实时摄像头画面
+  - `ChatPanel` - 交互式聊天界面
+  - `DetectionPanel` - 物体检测结果
+  - `Header` - 应用头部与控制
+  - `MainArea` - 中央工作区
+  - `SettingsPanel` - 配置设置
+  - `Sidebar` - 导航侧边栏
+
+### 🔌 后端 API 增强
+- WebSocket 端点 (`/ws/agent`) 用于实时更新
+- 场景管理（含解析逻辑）
+- 智能体桥接服务用于多智能体协调
+- 仿真服务集成 MuJoCo
+
+### 🛠️ 开发脚本
+- `scripts/start_dev.sh` - 开发环境启动器
+- `scripts/test_agent_debugger.sh` - 智能体调试器测试运行器
+- `scripts/test_system.sh` - 完整系统集成测试
+
+---
+
 ## 快速开始
 
 ### 安装

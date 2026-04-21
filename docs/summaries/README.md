@@ -77,6 +77,17 @@
 
 最新总结：[WEEK10_COMPLETION_SUMMARY.md](WEEK10_COMPLETION_SUMMARY.md)
 
+### v2.1.0 更新 (2026-04-21)
+
+- ✅ **MuJoCo 仿真集成** - 实时机器人仿真与可视化
+- ✅ **前端架构重构** - React + TypeScript + Tailwind CSS 组件化设计
+- ✅ **WebSocket 实时通信** - 智能体与前端双向通信
+- ✅ **Zustand 状态管理** - Chat、Settings、Status Store
+- ✅ **后端 API 增强** - 场景管理、仿真服务
+- ✅ **开发脚本** - start_dev.sh、test_agent_debugger.sh、test_system.sh
+
+总测试数：**720+**
+
 ## 相关文档
 
 - [项目完成报告](../PROJECT_COMPLETION_REPORT.md) - 总体项目成果

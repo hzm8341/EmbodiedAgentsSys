@@ -58,6 +58,42 @@
 
 ---
 
+## New in v2.1.0 (2026-04-21)
+
+### 🚀 MuJoCo Real-Time Simulation
+- **Integrated MuJoCo viewer** for real-time robot simulation
+- Scene builder with robot model, objects, lighting, and floor
+- IK (Inverse Kinematics) solver for trajectory planning
+- Force and contact sensors for grasp detection
+- Support for graspable objects (ball, cube, cylinder, box)
+
+### 🎨 Frontend Architecture Refactor
+- **Component-based design** with React + TypeScript + Tailwind CSS
+- **Zustand state management** for chat, settings, and status
+- **WebSocket real-time communication** with agent backend
+- New UI components:
+  - `AgentPanel` - Agent control and status
+  - `CameraPanel` - Real-time camera feed display
+  - `ChatPanel` - Interactive chat interface
+  - `DetectionPanel` - Object detection results
+  - `Header` - Application header with controls
+  - `MainArea` - Central workspace
+  - `SettingsPanel` - Configuration settings
+  - `Sidebar` - Navigation sidebar
+
+### 🔌 Backend API Enhancements
+- WebSocket endpoint (`/ws/agent`) for real-time updates
+- Scenario management with resolution logic
+- Agent bridge service for multi-agent coordination
+- Simulation service with MuJoCo integration
+
+### 🛠️ Development Scripts
+- `scripts/start_dev.sh` - Development environment launcher
+- `scripts/test_agent_debugger.sh` - Agent debugger test runner
+- `scripts/test_system.sh` - Full system integration tests
+
+---
+
 ## Quick Start
 
 ### Installation
