@@ -92,6 +92,48 @@
 - `scripts/test_agent_debugger.sh` - Agent debugger test runner
 - `scripts/test_system.sh` - Full system integration tests
 
+### 🧪 Testing MuJoCo Simulation
+
+#### Start Backend with Viewer
+
+```bash
+# Start backend + MuJoCo viewer window (recommended for testing robot motion)
+bash scripts/start_dev.sh --backend
+
+# Start backend in headless mode (no viewer, CI/terminal only)
+bash scripts/start_dev.sh --headless --backend
+```
+
+#### Test Robot Arm Control via Chat API
+
+```bash
+# Set DeepSeek API key
+export DEEPSEEK_API_KEY="sk-..."
+
+# Test right arm movement (note: y must be negative for right arm)
+curl -X POST http://localhost:8000/api/chat \
+  -H 'Content-Type: application/json' \
+  -H 'X-Api-Key: sk-...' \
+  -d '{"message": "将右臂移动到 x=0.3 y=-0.25 z=0.86", "history": []}'
+
+# Test left arm movement
+curl -X POST http://localhost:8000/api/chat \
+  -H 'Content-Type: application/json' \
+  -H 'X-Api-Key: sk-...' \
+  -d '{"message": "将左臂移动到 x=0.3 y=0.25 z=0.86", "history": []}'
+```
+
+#### Right Arm Workspace Constraints
+
+- **y-coordinate**: Must be **negative** (range: `[-0.35, -0.0.20]`)
+- **x-coordinate**: Up to 0.30m when z ≥ 0.86
+- **Example valid position**: `[0.3, -0.25, 0.86]`
+
+#### Troubleshooting
+
+- **Robot arm moves but doesn't animate in viewer**: This was a GIL contention issue - now fixed with `ThreadPoolExecutor`
+- **Viewer window doesn't appear**: Check X11/GLFW support, or use `--headless` mode
+
 ---
 
 ## Quick Start
