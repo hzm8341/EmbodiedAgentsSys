@@ -9,9 +9,9 @@ from pydantic import BaseModel, Field
 
 from agents.core.types import RobotObservation
 from backend.services.agent_bridge import agent_bridge
+from backend.services.event_bus import EventBus
 from backend.services.scenarios import SCENARIOS, list_scenarios
-from backend.services.simulation import simulation_service
-from backend.services.websocket_manager import agent_stream_manager
+from backend.services.websocket_hub import WebSocketHub
 
 
 class ObservationPayload(BaseModel):
@@ -31,12 +31,29 @@ class ExecuteTaskRequest(BaseModel):
 
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
+agent_event_bus = EventBus()
+agent_websocket_hub = WebSocketHub(agent_event_bus)
+agent_bridge.stream_manager = agent_websocket_hub
 
 
 @router.get("/scenarios")
 async def get_scenarios() -> list:
     """List all predefined debugging scenarios for the frontend catalog."""
     return list_scenarios()
+
+
+def _simulation_service():
+    from backend.services.simulation import simulation_service
+
+    return simulation_service
+
+
+def _parse_filter_values(raw: str | None) -> set[str] | None:
+    if not raw:
+        return None
+
+    values = {item.strip() for item in raw.split(",") if item.strip()}
+    return values or None
 
 
 @router.websocket("/ws")
@@ -47,7 +64,15 @@ async def agent_websocket(websocket: WebSocket) -> None:
     and receive streaming messages (task_start, planning, reasoning, execution,
     learning, result) as the agent processes the task.
     """
-    await agent_stream_manager.connect(websocket)
+    await agent_websocket_hub.connect(
+        websocket,
+        backend=websocket.query_params.get("backend"),
+        event_types=_parse_filter_values(
+            websocket.query_params.get("event") or websocket.query_params.get("type")
+        ),
+        robot_ids=_parse_filter_values(websocket.query_params.get("robot_id")),
+        message_format="legacy",
+    )
     try:
         while True:
             raw = await websocket.receive_text()
@@ -62,8 +87,47 @@ async def agent_websocket(websocket: WebSocket) -> None:
 
             msg_type = payload.get("type", "")
 
+            if msg_type == "switch_backend":
+                backend_id = payload.get("backend")
+                agent_websocket_hub.update_subscription(
+                    websocket,
+                    backend=backend_id if backend_id else None,
+                    event_types=_parse_filter_values(payload.get("event")),
+                    robot_ids=_parse_filter_values(payload.get("robot_id")),
+                )
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "backend_switched",
+                            "data": {"backend": backend_id},
+                        }
+                    )
+                )
+                continue
+
+            if msg_type == "subscribe":
+                agent_websocket_hub.update_subscription(
+                    websocket,
+                    backend=payload.get("backend"),
+                    event_types=_parse_filter_values(payload.get("event")),
+                    robot_ids=_parse_filter_values(payload.get("robot_id")),
+                )
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "subscription_updated",
+                            "data": {
+                                "backend": payload.get("backend"),
+                                "event": payload.get("event"),
+                                "robot_id": payload.get("robot_id"),
+                            },
+                        }
+                    )
+                )
+                continue
+
             if msg_type == "reset_to_home":
-                result = simulation_service.reset_to_home()
+                result = _simulation_service().reset_to_home()
                 await websocket.send_text(json.dumps({
                     "type": "reset_complete",
                     "data": result,
@@ -113,4 +177,4 @@ async def agent_websocket(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        agent_stream_manager.disconnect(websocket)
+        agent_websocket_hub.disconnect(websocket)

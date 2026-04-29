@@ -470,6 +470,19 @@ class MuJoCoDriver:
             "contacts": len(self._contact_sensor.get_contacts()),
         }
 
+    def get_joint_positions(self) -> dict[str, float]:
+        """Return current scalar joint positions keyed by joint name."""
+        positions: dict[str, float] = {}
+        for jid in range(self._model.njnt):
+            if self._model.jnt_type[jid] == mujoco.mjtJoint.mjJNT_FREE:
+                continue
+            name = mujoco.mj_id2name(self._model, mujoco.mjtObj.mjOBJ_JOINT, jid)
+            if not name:
+                continue
+            adr = int(self._model.jnt_qposadr[jid])
+            positions[name] = float(self._data.qpos[adr])
+        return positions
+
     def get_allowed_actions(self) -> list[str]:
         return ["move_to", "move_relative", "grasp", "release", "get_scene", "move_arm_to"]
 

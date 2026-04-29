@@ -1,9 +1,10 @@
 import type { SidebarItem } from './Sidebar'
-import { AgentPanel }     from './AgentPanel'
+import { AgentWorkspace } from './AgentWorkspace'
 import { ChatPanel }      from './ChatPanel'
 import { CameraPanel }    from './CameraPanel'
 import { DetectionPanel } from './DetectionPanel'
 import { SettingsPanel }  from './SettingsPanel'
+import { URDFPanel }      from './URDFPanel'
 
 interface Props {
   active: SidebarItem
@@ -11,7 +12,8 @@ interface Props {
 
 export const MainArea = ({ active }: Props) => (
   <main className="flex-1 bg-gray-100 p-5 overflow-auto min-w-0">
-    {active === 'agent'     && <AgentPanel />}
+    {active === 'agent'     && <AgentWorkspace />}
+    {active === 'urdf'      && <URDFPanel />}
     {active === 'chat'      && <ChatPanel />}
     {active === 'camera'    && <CameraPanel />}
     {active === 'detection' && <DetectionPanel />}

@@ -14,6 +14,7 @@ const URDFViewer: React.FC<URDFViewerProps> = ({ robotId, vuerPort }) => {
   const [showControls, setShowControls] = useState(true);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'joints' | 'ik'>('joints');
+  const vuerClientUrl = import.meta.env.VITE_VUER_CLIENT_URL ?? 'https://vuer.ai';
 
   // Force iframe reload when robot changes
   useEffect(() => {
@@ -66,7 +67,7 @@ const URDFViewer: React.FC<URDFViewerProps> = ({ robotId, vuerPort }) => {
         <div className="viewer-content" style={{ flex: 1, position: 'relative' }}>
           <iframe
             key={iframeKey}
-            src={`http://localhost:${vuerPort}?robot=${robotId}`}
+            src={`${vuerClientUrl}?ws=ws://localhost:${vuerPort}&robot=${encodeURIComponent(robotId)}`}
             className="vuer-iframe"
             style={{ width: '100%', height: '100%', border: 'none' }}
             allow="xr-spatial-tracking"

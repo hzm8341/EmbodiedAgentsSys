@@ -1,45 +1,43 @@
 """Robot state API endpoints."""
-from typing import Optional, List
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
+from backend.models.state import JointState, RobotRuntimeState
+from backend.services.state_store import state_store
 from backend.services.websocket_manager import manager
 
 router = APIRouter(prefix="/api/state", tags=["state"])
 
-
-class JointState(BaseModel):
-    joint_name: str
-    position: float
-    velocity: Optional[float] = None
+RobotState = RobotRuntimeState
 
 
-class RobotState(BaseModel):
-    robot_id: str
-    joints: List[JointState]
-    timestamp: float
+def _resolve_backend(robot_id: str, state: RobotState) -> str:
+    if state.backend != "unknown":
+        return state.backend
 
+    existing_state = state_store.get_robot_state(robot_id)
+    if existing_state is not None:
+        return existing_state.backend
 
-_current_states: dict = {}
+    return "unknown"
 
 
 @router.get("/{robot_id}", response_model=RobotState)
 async def get_robot_state(robot_id: str):
     """Get current state of a robot."""
-    if robot_id not in _current_states:
-        return RobotState(
-            robot_id=robot_id,
-            joints=[],
-            timestamp=0.0
-        )
-    return _current_states[robot_id]
+    state = state_store.get_robot_state(robot_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"Robot state not found: {robot_id}")
+    return state
 
 
 @router.post("/{robot_id}")
 async def update_robot_state(robot_id: str, state: RobotState):
     """Update robot state (called by simulation process)."""
-    _current_states[robot_id] = state
-    await manager.send_state(robot_id, state.dict())
+    normalized_state = state.model_copy(
+        update={"robot_id": robot_id, "backend": _resolve_backend(robot_id, state)}
+    )
+    state_store.put_robot_state(normalized_state)
+    await manager.send_state(robot_id, normalized_state.model_dump(by_alias=True))
     return {"status": "updated"}
 
 

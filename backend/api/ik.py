@@ -5,12 +5,14 @@ from pydantic import BaseModel
 import numpy as np
 import os
 import time
+from pathlib import Path
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../simulation/mujoco'))
 from ik_solver import IKChain
 
-from backend.api.state import _current_states, RobotState, JointState
+from backend.api.state import RobotState, JointState
+from backend.services.state_store import state_store
 
 router = APIRouter(prefix="/api/ik", tags=["ik"])
 
@@ -49,13 +51,22 @@ class IKSolveResponse(BaseModel):
 # Note: end_effector is the link name (child of the last joint), not the joint name
 ROBOT_CONFIGS = {
     "eyoubot": {
-        "urdf_path": "assets/eyoubot/eu_ca_vuer.urdf",
+        "urdf_path": "assets/eyoubot/eu_ca_simple.urdf",
         "end_effectors": {
-            "left": "Empty_Link21",   # child link of left_hand_joint7
-            "right": "Empty_Link14",  # child link of right_hand_joint7
+            "left": "Empty_LinkLEND",
+            "right": "Empty_LinkREND",
         }
     }
 }
+
+
+def _get_repo_root() -> Path:
+    """Return the repository root, even when imported from a git worktree."""
+    module_path = Path(__file__).resolve()
+    for parent in module_path.parents:
+        if parent.name == ".worktrees":
+            return parent.parent
+    return module_path.parents[2]
 
 
 def get_ik_chain(robot_id: str, target_link: str) -> IKChain:
@@ -69,10 +80,10 @@ def get_ik_chain(robot_id: str, target_link: str) -> IKChain:
         config = ROBOT_CONFIGS[robot_id]
         urdf_path = config["urdf_path"]
 
-        # Resolve relative path from project root
+        # Resolve relative path from the repository root so worktrees use the
+        # shared assets/ tree instead of a nested .worktrees/ path.
         if not os.path.isabs(urdf_path):
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            urdf_path = os.path.join(project_root, urdf_path)
+            urdf_path = str(_get_repo_root() / urdf_path)
 
         if not os.path.exists(urdf_path):
             raise HTTPException(status_code=400, detail=f"URDF not found: {urdf_path}")
@@ -125,11 +136,12 @@ async def solve_ik(req: IKSolveRequest):
             JointState(name=name, position=float(q))
             for name, q in zip(ik.joint_names, q_solution)
         ]
-        _current_states[req.robot_id] = RobotState(
+        state_store.put_robot_state(RobotState(
             robot_id=req.robot_id,
+            backend="mujoco",
             joints=joint_states,
             timestamp=time.time()
-        )
+        ))
 
         return IKSolveResponse(
             status="success",

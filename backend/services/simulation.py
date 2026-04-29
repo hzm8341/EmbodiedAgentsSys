@@ -4,6 +4,8 @@ import threading
 import time
 import mujoco
 from typing import Optional
+from backend.models.state import JointState, RobotRuntimeState
+from backend.services.state_store import state_store
 from simulation.mujoco import MuJoCoDriver
 from simulation.mujoco.config import DEFAULT_URDF_PATH
 
@@ -105,7 +107,9 @@ class SimulationService:
         """Execute action"""
         if self._driver is None:
             self.initialize()
-        return self._driver.execute_action(action, params)
+        receipt = self._driver.execute_action(action, params)
+        self._publish_state(status="active")
+        return receipt
 
     def get_scene(self) -> dict:
         """Get scene state"""
@@ -117,13 +121,33 @@ class SimulationService:
         """Reset robot to home position and restore objects."""
         if self._driver:
             self._driver.reset_to_home()
+            self._publish_state(status="idle")
         return {"status": "success", "message": "Reset to home position"}
 
     def reset(self):
         """Reset environment"""
         if self._driver:
             self._driver.reset()
+            self._publish_state(status="idle")
         return {"status": "success", "message": "Environment reset"}
+
+    def _publish_state(self, status: str) -> None:
+        """Publish current MuJoCo joint state for frontend/Vuer synchronization."""
+        if self._driver is None:
+            return
+        joints = [
+            JointState(name=name, position=position)
+            for name, position in self._driver.get_joint_positions().items()
+        ]
+        state_store.put_robot_state(
+            RobotRuntimeState(
+                robot_id="eyoubot",
+                backend="mujoco",
+                timestamp=time.time(),
+                joints=joints,
+                status=status,
+            )
+        )
 
 
 # Global instance

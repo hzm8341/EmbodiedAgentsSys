@@ -11,7 +11,7 @@ from aiohttp import web
 
 # Map robot_id -> (urdf_dir, urdf_file)
 ROBOT_URDF_MAP = {
-    "eyoubot": ("assets/eyoubot", "eu_ca_vuer.urdf"),
+    "eyoubot": ("assets/eyoubot", "eu_ca_describtion_lbs6.urdf"),
 }
 
 _current_robot = "eyoubot"
@@ -63,6 +63,13 @@ def create_app(host: str = "0.0.0.0", port: int = 8012):
         global _current_robot, _current_joints, _backend_url
 
         robot_id = _current_robot
+        try:
+            requested_robot = session.ws.url.query.get("robot")
+            if requested_robot in ROBOT_URDF_MAP:
+                robot_id = requested_robot
+                _current_robot = requested_robot
+        except Exception:
+            pass
         urdf_dir, urdf_file = ROBOT_URDF_MAP[robot_id]
         urdf_url = _make_urdf_url(urdf_dir, urdf_file)
 
@@ -122,8 +129,9 @@ def create_app(host: str = "0.0.0.0", port: int = 8012):
             print(f"Joint update error: {e}")
 
     # Register HTTP endpoints
-    app._route("/switch_robot", switch_robot_handler, method="GET")
-    app._route("/api/joint_state", joint_state_handler, method="POST")
+    app.add_route("/switch_robot", switch_robot_handler, method="GET")
+    app.add_route("/api/joint_state", joint_state_handler, method="POST")
+    app._add_static("/static", ".")
 
     return app
 
@@ -139,7 +147,7 @@ def main():
     print(f"Backend URL: {_backend_url}")
 
     app = create_app(args.host, args.port)
-    app.run()
+    app.start()
 
 
 if __name__ == '__main__':

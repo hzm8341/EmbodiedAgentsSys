@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Optional
 
 from agents.cognition.planning import DefaultPlanningLayer
@@ -11,9 +10,6 @@ from agents.cognition.reasoning import DefaultReasoningLayer
 from agents.cognition.learning import DefaultLearningLayer
 from agents.core.types import RobotObservation
 from backend.services.websocket_manager import agent_stream_manager
-
-_sim_executor = ThreadPoolExecutor(max_workers=1)
-
 
 class AgentBridge:
     """Coordinates planning/reasoning/learning layers and streams telemetry.
@@ -88,17 +84,16 @@ class AgentBridge:
         await self._emit("planning", {"plan": plan})
 
         max_steps = max_steps if max_steps is not None else (len(plan.get("action_sequence", [])) or 3)
-        loop = asyncio.get_event_loop()
+        feedbacks = []
 
         for step in range(max_steps):
             action = await self.reasoning.generate_action(plan, observation)
             await self._emit("reasoning", {"step": step, "action": action})
 
-            # Run blocking simulation call in dedicated thread
+            # MuJoCo actions are short animations in this debugger path. Keep
+            # execution inline so telemetry cannot hang on executor scheduling.
             try:
-                receipt = await loop.run_in_executor(
-                    _sim_executor,
-                    simulation_service.execute_action,
+                receipt = simulation_service.execute_action(
                     action.get("action", ""),
                     action.get("params", {}),
                 )
@@ -106,11 +101,14 @@ class AgentBridge:
                     "success": receipt.status.value == "success",
                     "step": step,
                     "action": action.get("action"),
+                    "params": action.get("params", {}),
                     "result": receipt.result_message,
+                    "result_data": receipt.result_data or {},
                 }
             except Exception as e:
                 feedback = {"success": False, "step": step, "result": str(e)}
 
+            feedbacks.append(feedback)
             await self._emit("execution", {"step": step, "feedback": feedback})
 
             improved = await self.learning.improve(action, feedback)
@@ -118,7 +116,10 @@ class AgentBridge:
                 "learning", {"step": step, "improved_action": improved}
             )
 
-        result_data = {"task_success": True, "steps_executed": max_steps}
+        result_data = {
+            "task_success": all(f.get("success", False) for f in feedbacks),
+            "steps_executed": len(feedbacks),
+        }
         await self._emit("result", result_data)
         return result_data
 

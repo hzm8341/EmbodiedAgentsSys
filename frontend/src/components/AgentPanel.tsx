@@ -79,7 +79,7 @@ export const AgentPanel = () => {
     if (!task.trim()) return
     clearMessages()
     setIsExecuting(true)
-    executeTask(task, { gripper_open: 1.0 }, selected ?? undefined, 3)
+    executeTask(task, { gripper_open: 1.0 }, selected ?? undefined, selected ? undefined : 3)
   }
 
   const handleReset = () => {
@@ -144,7 +144,7 @@ export const AgentPanel = () => {
           <div className="flex gap-2">
             <button
               onClick={handleExecute}
-              disabled={isExecuting || !task.trim()}
+              disabled={isExecuting || !task.trim() || !isConnected}
               className="flex-1 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isExecuting ? '执行中...' : 'Execute'}

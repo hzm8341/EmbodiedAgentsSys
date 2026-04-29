@@ -9,6 +9,16 @@ from vuer_server.urdf_loader import URDFLoader, URDFModel
 router = APIRouter(prefix="/api/urdf", tags=["urdf"])
 
 ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
+PREFERRED_URDF = "eu_ca_describtion_lbs6.urdf"
+
+
+def _pick_urdf_file(urdf_files: list[Path]) -> Optional[Path]:
+    if not urdf_files:
+        return None
+    for urdf in urdf_files:
+        if urdf.name == PREFERRED_URDF:
+            return urdf
+    return sorted(urdf_files)[0]
 
 
 class URDFListItem(BaseModel):
@@ -31,18 +41,19 @@ async def list_urdf_models():
 
     for robot_dir in ASSETS_DIR.iterdir():
         if robot_dir.is_dir():
-            urdf_files = list(robot_dir.glob("*.urdf"))
-            for urdf_file in urdf_files:
-                loader = URDFLoader(robot_dir)
-                try:
-                    model = loader.load(str(urdf_file))
-                    models.append(URDFListItem(
-                        robot_id=robot_dir.name,
-                        name=model.name,
-                        urdf_path=str(urdf_file.relative_to(ASSETS_DIR))
-                    ))
-                except Exception:
-                    continue
+            urdf_file = _pick_urdf_file(list(robot_dir.glob("*.urdf")))
+            if urdf_file is None:
+                continue
+            loader = URDFLoader(robot_dir)
+            try:
+                model = loader.load(str(urdf_file))
+                models.append(URDFListItem(
+                    robot_id=robot_dir.name,
+                    name=model.name,
+                    urdf_path=str(urdf_file.relative_to(ASSETS_DIR))
+                ))
+            except Exception:
+                continue
 
     return models
 
@@ -55,12 +66,12 @@ async def get_urdf_model(robot_id: str):
     if not robot_dir.exists():
         raise HTTPException(status_code=404, detail=f"Robot {robot_id} not found")
 
-    urdf_files = list(robot_dir.glob("*.urdf"))
-    if not urdf_files:
+    urdf_file = _pick_urdf_file(list(robot_dir.glob("*.urdf")))
+    if urdf_file is None:
         raise HTTPException(status_code=404, detail=f"No URDF found for {robot_id}")
 
     loader = URDFLoader(robot_dir)
-    model = loader.load(str(urdf_files[0]))
+    model = loader.load(str(urdf_file))
 
     return model
 
@@ -73,11 +84,11 @@ async def load_urdf(request: URDFLoadRequest):
     if not robot_dir.exists():
         raise HTTPException(status_code=404, detail=f"Robot {request.robot_id} not found")
 
-    urdf_files = list(robot_dir.glob("*.urdf"))
-    if not urdf_files:
+    urdf_file = _pick_urdf_file(list(robot_dir.glob("*.urdf")))
+    if urdf_file is None:
         raise HTTPException(status_code=404, detail=f"No URDF found")
 
     loader = URDFLoader(robot_dir)
-    model = loader.load(str(urdf_files[0]))
+    model = loader.load(str(urdf_file))
 
     return {"status": "loaded", "robot_id": request.robot_id, "model": model}

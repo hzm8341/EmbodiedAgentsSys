@@ -1,4 +1,4 @@
-vuer>=0.10.0
+vuer>=0.1.6,<0.2
 numpy
 pyzmq
 pydantic

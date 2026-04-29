@@ -7,9 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
-from fastapi import Header
-
-from backend.services.simulation import simulation_service
 
 router = APIRouter()
 
@@ -94,6 +91,12 @@ class ChatResponse(BaseModel):
     scene_state: Optional[dict] = None
 
 
+def _simulation_service():
+    from backend.services.simulation import simulation_service
+
+    return simulation_service
+
+
 def execute_robot_tool(tool_name: str, params: dict) -> dict:
     """执行机器人工具并返回结果"""
     action_map = {
@@ -111,10 +114,10 @@ def execute_robot_tool(tool_name: str, params: dict) -> dict:
 
     try:
         if action == "get_scene":
-            result = simulation_service.get_scene()
+            result = _simulation_service().get_scene()
             return {"status": "success", "data": result}
 
-        receipt = simulation_service.execute_action(action, params)
+        receipt = _simulation_service().execute_action(action, params)
         return {
             "status": receipt.status.value,
             "message": receipt.result_message,
@@ -209,7 +212,7 @@ async def chat(req: ChatRequest, x_api_key: Optional[str] = Header(None)):
     if not response_text:
         response_text = f"已执行 {len(tool_results)} 个工具调用"
 
-    scene_state = simulation_service.get_scene()
+    scene_state = _simulation_service().get_scene()
     return ChatResponse(
         response=response_text,
         tool_calls=tool_results,

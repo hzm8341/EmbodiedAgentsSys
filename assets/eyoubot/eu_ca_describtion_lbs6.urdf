@@ -27,7 +27,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/base_link1.STL" />
+          filename="meshes/SensorConnect.STL" />
       </geometry>
       <material
         name="">
@@ -41,7 +41,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="meshes/base_link1.STL" />
+          filename="meshes/SensorConnect.STL" />
       </geometry>
     </collision>
   </link>

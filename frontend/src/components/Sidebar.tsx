@@ -1,7 +1,8 @@
-export type SidebarItem = 'agent' | 'chat' | 'camera' | 'detection' | 'settings'
+export type SidebarItem = 'agent' | 'urdf' | 'chat' | 'camera' | 'detection' | 'settings'
 
 const ITEMS: { id: SidebarItem; icon: string; label: string }[] = [
   { id: 'agent',     icon: '🤖', label: 'Agent 调试器' },
+  { id: 'urdf',      icon: '🦾', label: 'URDF 视图' },
   { id: 'chat',      icon: '💬', label: '聊天控制' },
   { id: 'camera',    icon: '📷', label: '相机' },
   { id: 'detection', icon: '🎯', label: '目标检测' },

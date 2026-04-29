@@ -49,7 +49,7 @@ class DefaultReasoningLayer(ReasoningLayerBase):
             return action_dict
 
         # Fallback: no-op move when sequence is exhausted or absent
-        return {"action": "move_arm_to", "params": {"arm": "left", "x": 0.3, "y": 0.0, "z": 0.5}}
+        return {"action": "move_arm_to", "params": {"arm": "left", "x": 0.04, "y": 0.36, "z": 0.83}}
 
 
 # 保持向后兼容

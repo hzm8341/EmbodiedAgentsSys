@@ -7,13 +7,15 @@ from typing import Optional, Tuple
 
 
 # 工作台尺寸常量（用于物体位置对齐）
-_TABLE_TOP_Z = 0.68   # 台面顶部 z 坐标（台面中心 0.34 + 半高 0.34）
+_TABLE_TOP_Z = 0.79   # 台面顶部 z 坐标，靠近双臂可达高度
+TABLE_CENTER_Y = 0.38
+TABLE_HALF_Y = 0.16
 
 # 场景中可抓取物体的初始位置（世界坐标系，放在工作台上）
 GRASPABLE_OBJECTS = {
-    "red_cube":     {"pos": [0.45,  0.12,  _TABLE_TOP_Z + 0.038], "size": [0.038, 0.038, 0.038], "type": mujoco.mjtGeom.mjGEOM_BOX,    "rgba": [0.85, 0.18, 0.18, 1], "mass": 0.12},
-    "blue_block":   {"pos": [0.45, -0.12,  _TABLE_TOP_Z + 0.028], "size": [0.050, 0.036, 0.028], "type": mujoco.mjtGeom.mjGEOM_BOX,    "rgba": [0.18, 0.32, 0.85, 1], "mass": 0.15},
-    "yellow_sphere":{"pos": [0.52,  0.0,   _TABLE_TOP_Z + 0.032], "size": [0.032, 0.032, 0.032], "type": mujoco.mjtGeom.mjGEOM_SPHERE,  "rgba": [0.90, 0.75, 0.10, 1], "mass": 0.08},
+    "red_cube":     {"pos": [0.04, 0.36, _TABLE_TOP_Z + 0.038], "size": [0.038, 0.038, 0.038], "type": mujoco.mjtGeom.mjGEOM_BOX,    "rgba": [0.85, 0.18, 0.18, 1], "mass": 0.12},
+    "blue_block":   {"pos": [0.03, 0.31, _TABLE_TOP_Z + 0.028], "size": [0.050, 0.036, 0.028], "type": mujoco.mjtGeom.mjGEOM_BOX,    "rgba": [0.18, 0.32, 0.85, 1], "mass": 0.15},
+    "yellow_sphere":{"pos": [0.08, 0.42, _TABLE_TOP_Z + 0.032], "size": [0.032, 0.032, 0.032], "type": mujoco.mjtGeom.mjGEOM_SPHERE,  "rgba": [0.90, 0.75, 0.10, 1], "mass": 0.08},
 }
 
 
@@ -71,12 +73,12 @@ def build_robot_scene(urdf_path: str) -> Tuple[mujoco.MjModel, mujoco.MjData]:
     floor.friction = [1.0, 0.005, 0.0001]
     floor.condim = 3
 
-    # ── 工作台（底部贴地 z=0，台面顶部 z=0.68） ─────────────
+    # ── 工作台（底部贴地，台面靠近当前模型的双臂可达高度） ──
     table = wb.add_geom()
     table.name = "table_top"
     table.type = mujoco.mjtGeom.mjGEOM_BOX
-    table.pos = [0.45, 0.0, 0.34]   # center z=0.34 → bottom z=0, top z=0.68
-    table.size = [0.28, 0.38, 0.34]
+    table.pos = [0.04, TABLE_CENTER_Y, _TABLE_TOP_Z / 2]
+    table.size = [0.28, TABLE_HALF_Y, _TABLE_TOP_Z / 2]
     table.rgba = [0.55, 0.38, 0.22, 1]
     table.friction = [0.8, 0.005, 0.0001]
     table.condim = 3
