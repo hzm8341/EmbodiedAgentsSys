@@ -24,9 +24,11 @@ extensions = [
     "sphinx_copybutton",  # install with `pip install sphinx-copybutton`
     "autodoc2",  # install with `pip install sphinx-autodoc2`
     "myst_parser",  # install with `pip install myst-parser`
-    "sphinx_sitemap",  # install with `pip install sphinx-sitemap`
     "sphinx_design",  # install with `pip install sphinx-design`
 ]
+
+if os.getenv("SPHINX_DISABLE_SITEMAP", "0") != "1":
+    extensions.append("sphinx_sitemap")  # install with `pip install sphinx-sitemap`
 
 autodoc2_packages = [
     {
