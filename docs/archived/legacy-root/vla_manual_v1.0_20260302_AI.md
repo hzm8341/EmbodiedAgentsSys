@@ -569,6 +569,6 @@ ros2 topic echo /vla_controller/feedback
 
 更多示例和高级用法请参考以下资源：
 
-- [VLA与事件集成示例](./vla_with_event.md)
+- [VLA与事件集成示例](../../examples/planning_control/vla_with_event.md)
 - [LeRobot官方文档](https://huggingface.co/docs/lerobot)
 - [EmbodiedAgents官方文档](https://automatika-robotics.github.io/embodied-agents/)

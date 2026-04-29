@@ -90,7 +90,7 @@
 
 ## 相关文档
 
-- [项目完成报告](../PROJECT_COMPLETION_REPORT.md) - 总体项目成果
+- [项目完成报告](../archived/legacy-root/PROJECT_COMPLETION_REPORT.md) - 总体项目成果
 - [API 参考](../API_REFERENCE.md) - API 详细文档
 - [架构设计](../ARCHITECTURE.md) - 系统架构
 - [用户指南](../USER_GUIDE.md) - 使用说明

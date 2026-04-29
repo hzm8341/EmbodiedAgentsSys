@@ -7,7 +7,7 @@
 ### 旧版规划文档
 - **2026-03-05 期间的初始设计**：Agent Digital Worker 设计、实现计划
 - **2026-03-06~19 的多阶段计划**：各种功能计划（Dashboard、Stage 1-3 等）
-- **旧版本规划**：DEVELOPMENT_PLAN.md、INTEGRATION_PLAN.md 等
+- **旧版本规划**：legacy-root/DEVELOPMENT_PLAN.md、legacy-root/INTEGRATION_PLAN.md 等
 
 ### AI 生成的分析文档 (v1.0)
 - VLA 对比分析
@@ -25,13 +25,13 @@
 
 请查看以下位置获取最新文档：
 
-- **项目概述**：[/README.md](../README.md)
+- **项目概述**：[/README.md](../../README.md)
 - **API 参考**：[/docs/API_REFERENCE.md](../API_REFERENCE.md)
 - **用户指南**：[/docs/USER_GUIDE.md](../USER_GUIDE.md)
 - **开发者指南**：[/docs/DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md)
 - **架构文档**：[/docs/ARCHITECTURE.md](../ARCHITECTURE.md)
 - **最新实现计划**：[/docs/plans/](../plans/)
-- **周度总结**：[/WEEK*.md](../../) (根目录)
+- **周度总结**：[/docs/summaries](../summaries/) (summaries 目录)
 
 ## 归档时间
 
