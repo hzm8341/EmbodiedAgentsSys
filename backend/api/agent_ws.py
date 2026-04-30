@@ -7,10 +7,10 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from agents.core.types import RobotObservation
-from backend.services.agent_bridge import agent_bridge
+from backend.models.task_protocol import TaskRequest
 from backend.services.event_bus import EventBus
-from backend.services.scenarios import SCENARIOS, list_scenarios
+from backend.services.scenarios import list_scenarios
+from backend.services.task_execution_service import task_execution_service
 from backend.services.websocket_hub import WebSocketHub
 
 
@@ -33,7 +33,6 @@ class ExecuteTaskRequest(BaseModel):
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 agent_event_bus = EventBus()
 agent_websocket_hub = WebSocketHub(agent_event_bus)
-agent_bridge.stream_manager = agent_websocket_hub
 
 
 @router.get("/scenarios")
@@ -151,28 +150,17 @@ async def agent_websocket(websocket: WebSocket) -> None:
                 continue
 
             # Resolve scenario: try explicit name → task as name → task description match
-            scenario = (
-                SCENARIOS.get(request.scenario)
-                or SCENARIOS.get(request.task)
-                or next((s for s in SCENARIOS.values() if s.task == request.task), None)
-            )
-            action_sequence = scenario.action_sequence if scenario else None
-
-            if scenario and not any(request.observation.state):
-                obs_src = scenario.build_observation()
-                observation = obs_src
-            else:
-                observation = RobotObservation(
-                    state=dict(request.observation.state),
-                    gripper=dict(request.observation.gripper),
-                    image=request.observation.image,
-                )
-
-            await agent_bridge.run_with_telemetry(
+            unified_request = TaskRequest(
                 task=request.task,
-                observation=observation,
-                action_sequence=action_sequence,
+                scenario=request.scenario,
+                observation_state=dict(request.observation.state),
+                observation_gripper=dict(request.observation.gripper),
+                observation_image=request.observation.image,
                 max_steps=request.max_steps,
+            )
+            await task_execution_service.execute_task(
+                unified_request,
+                downstream_stream_manager=agent_websocket_hub,
             )
     except WebSocketDisconnect:
         pass

@@ -5,8 +5,10 @@ import asyncio
 import httpx
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
+from backend.models.task_protocol import TaskRequest, TaskResult
+from backend.services.task_execution_service import task_execution_service
 
 router = APIRouter()
 
@@ -89,6 +91,13 @@ class ChatResponse(BaseModel):
     response: str
     tool_calls: list[ToolCallResult] = []
     scene_state: Optional[dict] = None
+
+
+class ExecuteTaskRESTRequest(BaseModel):
+    task: str
+    scenario: Optional[str] = None
+    observation: dict = Field(default_factory=dict)
+    max_steps: Optional[int] = None
 
 
 def _simulation_service():
@@ -218,3 +227,18 @@ async def chat(req: ChatRequest, x_api_key: Optional[str] = Header(None)):
         tool_calls=tool_results,
         scene_state=scene_state,
     )
+
+
+@router.post("/chat/execute_task", response_model=TaskResult)
+async def execute_task_via_rest(req: ExecuteTaskRESTRequest):
+    """Unified REST task entry that shares the same service with WebSocket."""
+    observation = req.observation or {}
+    unified_request = TaskRequest(
+        task=req.task,
+        scenario=req.scenario,
+        observation_state=dict(observation.get("state", {})),
+        observation_gripper=dict(observation.get("gripper", {})),
+        observation_image=observation.get("image"),
+        max_steps=req.max_steps,
+    )
+    return await task_execution_service.execute_task(unified_request)
