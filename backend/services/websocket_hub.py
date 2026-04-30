@@ -82,8 +82,9 @@ class WebSocketHub:
 
     def _coerce_message(self, message: dict[str, Any]) -> EventEnvelope:
         extensions = dict(message.get("extensions", {}))
-        if "status" in message:
-            extensions.setdefault("status", message["status"])
+        for field in ("status", "trace_id", "step", "error_code", "protocol_version"):
+            if field in message:
+                extensions.setdefault(field, message[field])
 
         return EventEnvelope(
             event=message.get("event") or message.get("type", "message"),
@@ -127,7 +128,9 @@ class WebSocketHub:
                 "timestamp": event.ts,
                 "seq": event.seq,
                 "task_id": event.task_id,
-                "data": event.payload,
+                "step": event.extensions.get("step"),
+                "payload": event.payload,
+                "data": event.payload,  # legacy alias
             }
             payload.update(event.extensions)
             return json.dumps(payload)

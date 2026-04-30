@@ -73,14 +73,16 @@ class TaskExecutionService:
 
         events: list[ExecutionEvent] = []
         for message in collector.raw_events:
-            data = message.get("data", {})
+            payload = message.get("payload", message.get("data", {}))
             events.append(
                 ExecutionEvent(
+                    protocol_version=str(message.get("protocol_version", "v1")),
                     type=message.get("type", "unknown"),
                     timestamp=float(message.get("timestamp", 0.0)),
                     status=str(message.get("status", "completed")),
-                    step=data.get("step"),
-                    payload=data if isinstance(data, dict) else {},
+                    step=message.get("step"),
+                    payload=payload if isinstance(payload, dict) else {},
+                    error_code=message.get("error_code"),
                 )
             )
 
@@ -106,4 +108,3 @@ class TaskExecutionService:
 
 
 task_execution_service = TaskExecutionService()
-

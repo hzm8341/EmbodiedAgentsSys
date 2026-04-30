@@ -32,29 +32,29 @@ export function useAgentWebSocket(url: string) {
       try {
         const msg: AgentMessage = JSON.parse(evt.data)
         setMessages((prev) => [...prev, msg])
-        const data = (msg.data ?? {}) as any
+        const body = (msg.payload ?? msg.data ?? {}) as any
         if (msg.type === 'task_start') {
-          const task = String(data.task ?? '')
+          const task = String(body.task ?? '')
           setCurrentTask(task)
         }
         if (msg.type === 'reasoning') {
-          const step = Number(data.step ?? -1)
-          const action = String(data.action?.action ?? '')
-          const arm = String(data.action?.params?.arm ?? '')
-          const x = Number(data.action?.params?.x)
-          const y = Number(data.action?.params?.y)
-          const z = Number(data.action?.params?.z)
+          const step = Number(body.step ?? msg.step ?? -1)
+          const action = String(body.action?.action ?? '')
+          const arm = String(body.action?.params?.arm ?? '')
+          const x = Number(body.action?.params?.x)
+          const y = Number(body.action?.params?.y)
+          const z = Number(body.action?.params?.z)
           const target = Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) ? [x, y, z] as [number, number, number] : null
           setReasoningAction(step, action, arm, target)
         }
         if (msg.type === 'execution') {
-          const fb = data.feedback as any
+          const fb = body.feedback as any
           const targetRaw = fb?.result_data?.target
           const actualRaw = fb?.result_data?.actual
           const target = Array.isArray(targetRaw) && targetRaw.length === 3 ? [Number(targetRaw[0]), Number(targetRaw[1]), Number(targetRaw[2])] as [number, number, number] : undefined
           const actual = Array.isArray(actualRaw) && actualRaw.length === 3 ? [Number(actualRaw[0]), Number(actualRaw[1]), Number(actualRaw[2])] as [number, number, number] : undefined
           commitExecution({
-            step: Number(data.step ?? fb?.step ?? -1),
+            step: Number(body.step ?? msg.step ?? fb?.step ?? -1),
             action: String(fb?.action ?? ''),
             arm: fb?.params?.arm ? String(fb.params.arm) : undefined,
             target,

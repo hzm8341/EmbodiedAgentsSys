@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import uuid
 from typing import Any, Optional
 
 from agents.cognition.planning import DefaultPlanningLayer
@@ -43,17 +44,27 @@ class AgentBridge:
 
     async def _emit(
         self,
+        trace_id: str,
         message_type: str,
-        data: dict,
+        payload: dict,
         status: str = "completed",
+        step: int | None = None,
+        error_code: str | None = None,
     ) -> None:
-        """Broadcast a telemetry message with timestamp and status."""
+        """Broadcast a v1 telemetry message while keeping legacy compatibility."""
+        ts = time.time()
         await self.stream_manager.broadcast(
             {
+                "protocol_version": "v1",
                 "type": message_type,
-                "timestamp": time.time(),
+                "trace_id": trace_id,
+                "step": step,
+                "timestamp": ts,
                 "status": status,
-                "data": data,
+                "error_code": error_code,
+                "payload": payload,
+                # legacy field kept for existing clients/tests
+                "data": payload,
             }
         )
 
@@ -78,17 +89,20 @@ class AgentBridge:
         """
         from backend.services.simulation import simulation_service
 
-        await self._emit("task_start", {"task": task})
+        trace_id = f"trace_{uuid.uuid4().hex[:16]}"
+        await self._emit(trace_id, "task_start", {"task": task})
 
         plan = await self.planning.generate_plan(task, action_sequence=action_sequence)
-        await self._emit("planning", {"plan": plan})
+        await self._emit(trace_id, "planning", {"plan": plan})
 
         max_steps = max_steps if max_steps is not None else (len(plan.get("action_sequence", [])) or 3)
         feedbacks = []
 
         for step in range(max_steps):
             action = await self.reasoning.generate_action(plan, observation)
-            await self._emit("reasoning", {"step": step, "action": action})
+            await self._emit(
+                trace_id, "reasoning", {"step": step, "action": action}, step=step
+            )
 
             # MuJoCo actions are short animations in this debugger path. Keep
             # execution inline so telemetry cannot hang on executor scheduling.
@@ -109,18 +123,23 @@ class AgentBridge:
                 feedback = {"success": False, "step": step, "result": str(e)}
 
             feedbacks.append(feedback)
-            await self._emit("execution", {"step": step, "feedback": feedback})
+            await self._emit(
+                trace_id, "execution", {"step": step, "feedback": feedback}, step=step
+            )
 
             improved = await self.learning.improve(action, feedback)
             await self._emit(
-                "learning", {"step": step, "improved_action": improved}
+                trace_id,
+                "learning",
+                {"step": step, "improved_action": improved},
+                step=step,
             )
 
         result_data = {
             "task_success": all(f.get("success", False) for f in feedbacks),
             "steps_executed": len(feedbacks),
         }
-        await self._emit("result", result_data)
+        await self._emit(trace_id, "result", result_data)
         return result_data
 
 
