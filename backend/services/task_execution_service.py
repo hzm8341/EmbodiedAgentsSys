@@ -8,6 +8,7 @@ from agents.core.types import RobotObservation
 from backend.models.task_protocol import ExecutionEvent, TaskRequest, TaskResult
 from backend.services.agent_bridge import agent_bridge
 from backend.services.scenarios import SCENARIOS
+from backend.services.trace_store import trace_store
 
 
 class _NoopStreamManager:
@@ -72,23 +73,29 @@ class TaskExecutionService:
                 agent_bridge.stream_manager = previous_stream_manager
 
         events: list[ExecutionEvent] = []
+        trace_id: str | None = None
         for message in collector.raw_events:
             payload = message.get("payload", message.get("data", {}))
+            trace_id = trace_id or message.get("trace_id")
             events.append(
                 ExecutionEvent(
                     protocol_version=str(message.get("protocol_version", "v1")),
                     type=message.get("type", "unknown"),
                     timestamp=float(message.get("timestamp", 0.0)),
                     status=str(message.get("status", "completed")),
+                    trace_id=message.get("trace_id"),
                     step=message.get("step"),
                     payload=payload if isinstance(payload, dict) else {},
                     error_code=message.get("error_code"),
                 )
             )
+            if trace_id:
+                trace_store.append_event(trace_id, message)
 
         scene_state = self._simulation_service().get_scene()
-        return TaskResult(
+        task_result = TaskResult(
             task=request.task,
+            trace_id=trace_id,
             success=bool(result_data.get("task_success", False)),
             steps_executed=int(result_data.get("steps_executed", 0)),
             message=(
@@ -99,6 +106,14 @@ class TaskExecutionService:
             events=events,
             scene_state=scene_state,
         )
+        if trace_id:
+            trace_store.append_result(
+                trace_id,
+                task=request.task,
+                result=task_result.model_dump(),
+                operator=None,
+            )
+        return task_result
 
     @staticmethod
     def _simulation_service():

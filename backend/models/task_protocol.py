@@ -33,6 +33,7 @@ class ExecutionEvent(BaseModel):
     type: str
     timestamp: float
     status: str = "completed"
+    trace_id: str | None = None
     step: int | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     error_code: str | None = None
@@ -43,9 +44,9 @@ class TaskResult(BaseModel):
 
     protocol_version: str = "v1"
     task: str
+    trace_id: str | None = None
     success: bool
     steps_executed: int
     message: str = ""
     events: list[ExecutionEvent] = Field(default_factory=list)
     scene_state: dict[str, Any] | None = None
-
