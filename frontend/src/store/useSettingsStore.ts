@@ -12,6 +12,7 @@ interface SettingsState {
   apiUrl: string
   refreshRate: number
   deepseekApiKey: string
+  realModeToken: string
   setLanguage: (lang: Language) => void
   setTheme: (theme: Theme) => void
   setModel: (model: string) => void
@@ -19,6 +20,7 @@ interface SettingsState {
   setApiUrl: (url: string) => void
   setRefreshRate: (rate: number) => void
   setDeepseekApiKey: (key: string) => void
+  setRealModeToken: (token: string) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -31,6 +33,7 @@ export const useSettingsStore = create<SettingsState>()(
       apiUrl: `${window.location.origin}/api`,
       refreshRate: 15,
       deepseekApiKey: '',
+      realModeToken: '',
       setLanguage: (lang) => set({ language: lang }),
       setTheme: (theme) => set({ theme }),
       setModel: (model) => set({ model }),
@@ -38,6 +41,7 @@ export const useSettingsStore = create<SettingsState>()(
       setApiUrl: (url) => set({ apiUrl: url }),
       setRefreshRate: (rate) => set({ refreshRate: rate }),
       setDeepseekApiKey: (key) => set({ deepseekApiKey: key }),
+      setRealModeToken: (token) => set({ realModeToken: token }),
     }),
     { name: 'dashboard-settings' }
   )

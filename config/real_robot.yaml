@@ -1,0 +1,6 @@
+backend_id: real_robot
+transport: mock
+requires_auth: true
+heartbeat_interval_sec: 1.0
+reconnect_backoff_sec: 2.0
+command_timeout_sec: 10.0

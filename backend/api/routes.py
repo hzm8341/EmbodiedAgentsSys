@@ -96,6 +96,26 @@ def execute_backend_command(backend_id: str, command: str, req: BackendCommandRe
     return result
 
 
+@router.post("/backends/{backend_id}/lifecycle/{operation}")
+def backend_lifecycle(backend_id: str, operation: str):
+    try:
+        backend = backend_registry.get_backend(backend_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown backend: {backend_id}") from exc
+
+    method_map = {
+        "init": "initialize",
+        "heartbeat": "heartbeat",
+        "reconnect": "reconnect",
+        "shutdown": "shutdown",
+    }
+    method_name = method_map.get(operation)
+    if method_name is None or not hasattr(backend, method_name):
+        raise HTTPException(status_code=404, detail=f"Unsupported operation: {operation}")
+    method = getattr(backend, method_name)
+    return method()
+
+
 @router.get("/view/scene")
 def get_scene_view():
     ensure_default_backends()

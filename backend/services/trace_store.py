@@ -17,9 +17,17 @@ class TraceStore:
     def _trace_path(self, trace_id: str) -> Path:
         return self.root / f"{trace_id}.jsonl"
 
-    def append_event(self, trace_id: str, event: dict[str, Any]) -> None:
+    def append_event(
+        self, trace_id: str, event: dict[str, Any], operator: str | None = None
+    ) -> None:
         line = json.dumps(
-            {"kind": "event", "trace_id": trace_id, "recorded_at": time.time(), **event},
+            {
+                "kind": "event",
+                "trace_id": trace_id,
+                "recorded_at": time.time(),
+                "operator": operator,
+                **event,
+            },
             ensure_ascii=False,
         )
         with self._trace_path(trace_id).open("a", encoding="utf-8") as f:
@@ -80,4 +88,3 @@ class TraceStore:
 
 
 trace_store = TraceStore()
-

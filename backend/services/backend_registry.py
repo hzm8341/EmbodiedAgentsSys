@@ -44,11 +44,13 @@ backend_registry = BackendRegistry()
 
 def ensure_default_backends(simulation_service=None) -> None:
     from backend.backends.mujoco_backend import MujocoBackend
+    from backend.backends.real_robot_backend import RealRobotBackend
     from backend.backends.ros2_gazebo_backend import ROS2GazeboBackend
 
     for backend in (
         MujocoBackend(simulation_service=simulation_service),
         ROS2GazeboBackend(node=None),
+        RealRobotBackend(),
     ):
         try:
             backend_registry.register(backend)
