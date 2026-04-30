@@ -1,3 +1,5 @@
+:orphan:
+
 # Skill Frontmatter 格式规范
 
 本文档定义 EmbodiedAgentsSys Skill 的 Markdown frontmatter 格式。

@@ -1,3 +1,5 @@
+:orphan:
+
 # IK End-Effector Control Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

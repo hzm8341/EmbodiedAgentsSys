@@ -1,3 +1,5 @@
+:orphan:
+
 # 交互式代理调试器 (Agent Debugger)
 
 基于 WebSocket 的前后端系统，用于实时观察具身智能代理的四层架构（Planning → Reasoning → Execution → Learning）推理过程。

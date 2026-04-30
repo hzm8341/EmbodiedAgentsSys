@@ -1,3 +1,5 @@
+:orphan:
+
 # Agent Dashboard 可视化界面设计
 
 > **Date:** 2026-03-14

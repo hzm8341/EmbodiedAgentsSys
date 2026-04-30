@@ -1,3 +1,5 @@
+:orphan:
+
 # MuJoCo Viewer + Frontend Integration Design
 
 ## Goal

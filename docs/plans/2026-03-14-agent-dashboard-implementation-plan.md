@@ -1,3 +1,5 @@
+:orphan:
+
 # Agent Dashboard 可视化界面实现计划
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

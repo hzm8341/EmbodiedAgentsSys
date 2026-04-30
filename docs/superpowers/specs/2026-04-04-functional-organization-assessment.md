@@ -1,3 +1,5 @@
+:orphan:
+
 # EmbodiedAgentsSys 功能点组织评估
 ## 如何清晰组织模块，支持 CaP-X 集成
 

@@ -1,3 +1,5 @@
+:orphan:
+
 # agent_skill_VLA_ROS2 与 ros-agents 对比分析及整合方案
 
 ## 一、项目背景与定位

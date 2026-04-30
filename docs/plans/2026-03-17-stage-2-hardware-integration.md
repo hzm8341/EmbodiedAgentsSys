@@ -1,3 +1,5 @@
+:orphan:
+
 # EmbodiedAgentsSys 实施计划 - 阶段 2：接入真实硬件
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

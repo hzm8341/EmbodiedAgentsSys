@@ -1,3 +1,5 @@
+:orphan:
+
 # Async API + WebSocket 实时通信增强 实现计划
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

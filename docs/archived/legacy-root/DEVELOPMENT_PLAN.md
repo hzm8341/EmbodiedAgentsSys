@@ -1,3 +1,5 @@
+:orphan:
+
 # EmbodiedAgentsSys 详细开发计划
 
 > 基于 INTEGRATION_PLAN.md v2 制定。共 7 个 Phase，29 个工作日。

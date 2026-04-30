@@ -1,3 +1,5 @@
+:orphan:
+
 # 三层分离架构设计文档：EmbodiedAgentsSys 工业级安全隔离
 
 **文档版本**: 1.0

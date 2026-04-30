@@ -1,3 +1,5 @@
+:orphan:
+
 # Phase 1: HAL System Implementation Plan (v2 - Industrial Safety)
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

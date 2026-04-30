@@ -1,3 +1,5 @@
+:orphan:
+
 # 仿真验证 + 前端交互式调试工具 实施计划
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

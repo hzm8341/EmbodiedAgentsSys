@@ -1,3 +1,5 @@
+:orphan:
+
 # PhyAgentOS Integration Design - EmbodiedAgentsSys v3.0
 
 **Version**: 1.0

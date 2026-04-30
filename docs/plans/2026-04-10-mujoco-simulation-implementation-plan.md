@@ -1,3 +1,5 @@
+:orphan:
+
 # MuJoCo 仿真环境集成实施计划
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

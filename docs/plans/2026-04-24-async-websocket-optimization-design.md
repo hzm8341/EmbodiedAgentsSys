@@ -1,3 +1,5 @@
+:orphan:
+
 # Async API + WebSocket 实时通信增强设计
 
 日期: 2026-04-24 | 方案: B (仿真专用事件循环 + Pub/Sub 状态流)

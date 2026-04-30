@@ -1,3 +1,5 @@
+:orphan:
+
 # CaP-X 架构分析 — 与 EmbodiedAgentsSys 的对标
 
 **日期**: 2026-04-03

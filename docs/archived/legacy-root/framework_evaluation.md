@@ -1,3 +1,5 @@
+:orphan:
+
 # Agent+Skill+VLA 通用具身智能机器人框架评估报告
 
 **版本**: v1.0  

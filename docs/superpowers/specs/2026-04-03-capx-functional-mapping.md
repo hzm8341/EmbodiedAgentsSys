@@ -1,3 +1,5 @@
+:orphan:
+
 # CaP-X 功能点对标分析 — EmbodiedAgentsSys 的逐一对标
 
 **日期**: 2026-04-03

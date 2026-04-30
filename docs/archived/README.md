@@ -1,3 +1,5 @@
+:orphan:
+
 # 📦 Archived Documents
 
 本目录包含已完成或过期的文档。这些文档保存以供历史参考。

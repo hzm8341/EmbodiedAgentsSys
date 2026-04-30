@@ -1,3 +1,5 @@
+:orphan:
+
 # EmbodiedAgentsSys 用户友好性评估
 ## 如何降低学习成本，使用户快速上手
 
