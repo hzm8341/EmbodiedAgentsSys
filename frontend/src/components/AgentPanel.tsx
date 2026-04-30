@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSettingsStore } from '../store/useSettingsStore'
 import { useAgentWebSocket } from '../hooks/useAgentWebSocket'
+import { useSyncStore } from '../store/useSyncStore'
 import type { AgentMessage, Scenario } from '../types'
 
 // ── 工具函数 ────────────────────────────────────────────────────────────────
@@ -52,9 +53,13 @@ function LayerCard({
 
 // ── AgentPanel ──────────────────────────────────────────────────────────────
 export const AgentPanel = () => {
-  const { websocketUrl } = useSettingsStore()
-  const { isConnected, messages, executeTask, resetToHome, clearMessages } =
-    useAgentWebSocket(websocketUrl)
+  const { websocketUrl, realModeToken } = useSettingsStore()
+  const wsUrlWithToken = realModeToken
+    ? `${websocketUrl}${websocketUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(realModeToken)}`
+    : websocketUrl
+  const { isConnected, messages, executeTask, resetToHome, pauseTask, resumeTask, stepTask, abortTask, approveTask, rejectTask, clearMessages } =
+    useAgentWebSocket(wsUrlWithToken)
+  const { executionState } = useSyncStore()
 
   const [task, setTask] = useState('')
   const [scenarios, setScenarios] = useState<Scenario[]>([])
@@ -93,6 +98,7 @@ export const AgentPanel = () => {
   const errors = messages.filter((m) => m.type === 'error')
   const taskStart = messages.find((m) => m.type === 'task_start')
   const success = (result?.data?.task_success as boolean | undefined) ?? false
+  const approvalRequired = messages.find((m) => m.type === 'approval_required')
 
   return (
     <div className="flex gap-4 h-full">
@@ -165,6 +171,19 @@ export const AgentPanel = () => {
               Home
             </button>
           </div>
+          <div className="grid grid-cols-4 gap-2">
+            <button onClick={pauseTask} disabled={!isExecuting} className="px-2 py-1 bg-yellow-500 text-white rounded text-xs disabled:opacity-40">Pause</button>
+            <button onClick={resumeTask} disabled={!isExecuting} className="px-2 py-1 bg-green-600 text-white rounded text-xs disabled:opacity-40">Resume</button>
+            <button onClick={stepTask} disabled={!isExecuting} className="px-2 py-1 bg-blue-600 text-white rounded text-xs disabled:opacity-40">Step</button>
+            <button onClick={abortTask} disabled={!isExecuting} className="px-2 py-1 bg-red-600 text-white rounded text-xs disabled:opacity-40">Abort</button>
+          </div>
+          {approvalRequired && (
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={approveTask} className="px-2 py-1 bg-emerald-600 text-white rounded text-xs">Approve</button>
+              <button onClick={rejectTask} className="px-2 py-1 bg-rose-600 text-white rounded text-xs">Reject</button>
+            </div>
+          )}
+          <div className="text-xs text-gray-500">Execution State: <span className="font-semibold text-gray-700">{executionState}</span></div>
         </div>
 
         {/* Observation */}

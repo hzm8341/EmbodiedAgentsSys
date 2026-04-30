@@ -74,6 +74,7 @@ class AgentBridge:
         observation: RobotObservation,
         action_sequence: list | None = None,
         max_steps: int | None = None,
+        controller: Any | None = None,
     ) -> dict:
         """Execute task through the four-layer pipeline, broadcasting each step.
 
@@ -99,6 +100,19 @@ class AgentBridge:
         feedbacks = []
 
         for step in range(max_steps):
+            if controller is not None:
+                await controller.wait_for_turn(step)
+                if controller.should_abort:
+                    await self._emit(
+                        trace_id,
+                        "error",
+                        {"message": "execution aborted by operator"},
+                        status="aborted",
+                        step=step,
+                        error_code="ABORTED",
+                    )
+                    break
+
             action = await self.reasoning.generate_action(plan, observation)
             await self._emit(
                 trace_id, "reasoning", {"step": step, "action": action}, step=step
@@ -127,6 +141,13 @@ class AgentBridge:
                 trace_id, "execution", {"step": step, "feedback": feedback}, step=step
             )
 
+            # Refresh observation after every action so the next reasoning step
+            # uses the latest world state (closed-loop control).
+            try:
+                observation = simulation_service.get_observation()
+            except Exception:
+                observation = observation
+
             improved = await self.learning.improve(action, feedback)
             await self._emit(
                 trace_id,
@@ -135,8 +156,11 @@ class AgentBridge:
                 step=step,
             )
 
+            if controller is not None:
+                controller.mark_step_completed()
+
         result_data = {
-            "task_success": all(f.get("success", False) for f in feedbacks),
+            "task_success": bool(feedbacks) and all(f.get("success", False) for f in feedbacks),
             "steps_executed": len(feedbacks),
         }
         await self._emit(trace_id, "result", result_data)

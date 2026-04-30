@@ -31,6 +31,7 @@ class HumanOversightEngine:
         self.alert_system = AlertSystem()
         self.boundary_checker = BoundaryChecker()
         self.manual_override_action: Action = None
+        self._pending_approval = False
 
     def transition_mode(
         self,
@@ -148,3 +149,21 @@ class HumanOversightEngine:
             True if current mode is EMERGENCY_STOP, False otherwise
         """
         return self.current_mode == SystemMode.EMERGENCY_STOP
+
+    def request_approval(self) -> None:
+        self._pending_approval = True
+
+    def approve(self) -> None:
+        self._pending_approval = False
+
+    def reject(self) -> None:
+        self._pending_approval = False
+        self.transition_mode(
+            SystemMode.PAUSED,
+            reason="operator rejected high-risk task",
+            triggered_by="approver",
+        )
+
+    @property
+    def pending_approval(self) -> bool:
+        return self._pending_approval

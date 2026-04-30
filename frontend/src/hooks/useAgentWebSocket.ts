@@ -8,7 +8,7 @@ export function useAgentWebSocket(url: string) {
   const [isConnected, setIsConnected] = useState(false)
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const { setConnectionStatus, setRobotStatus } = useStatusStore()
-  const { setCurrentTask, setReasoningAction, commitExecution, clearSync } = useSyncStore()
+  const { setCurrentTask, setReasoningAction, commitExecution, clearSync, setExecutionState } = useSyncStore()
 
   useEffect(() => {
     const ws = new WebSocket(url)
@@ -63,6 +63,26 @@ export function useAgentWebSocket(url: string) {
             timestamp: Number(msg.timestamp ?? Date.now() / 1000),
           })
         }
+        if (msg.type === 'execution_status') {
+          const state = String(body.state ?? 'idle')
+          if (state === 'running' || state === 'paused' || state === 'aborted' || state === 'completed') {
+            setExecutionState(state)
+          } else {
+            setExecutionState('idle')
+          }
+          if (state === 'paused') setRobotStatus('paused')
+          if (state === 'aborted') setRobotStatus('aborted')
+        }
+        if (msg.type === 'execution_control') {
+          const state = String(body.state ?? '')
+          if (state === 'paused' || state === 'running' || state === 'aborted') {
+            setExecutionState(state as 'paused' | 'running' | 'aborted')
+          }
+        }
+        if (msg.type === 'approval_required') {
+          setExecutionState('paused')
+          setRobotStatus('paused')
+        }
         if (msg.type === 'execution') setRobotStatus('working')
         if (msg.type === 'result' || msg.type === 'error') setRobotStatus('idle')
       } catch (e) {
@@ -71,7 +91,7 @@ export function useAgentWebSocket(url: string) {
     }
 
     return () => ws.close()
-  }, [url, setConnectionStatus, setRobotStatus])
+  }, [url, setConnectionStatus, setExecutionState, setRobotStatus])
 
   const executeTask = useCallback(
     (task: string, observationState: Record<string, number>, scenario?: string, maxSteps?: number) => {
@@ -93,10 +113,52 @@ export function useAgentWebSocket(url: string) {
     wsRef.current.send(JSON.stringify({ type: 'reset_to_home' }))
   }, [])
 
+  const pauseTask = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'pause_task' }))
+  }, [])
+
+  const resumeTask = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'resume_task' }))
+  }, [])
+
+  const stepTask = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'step_task' }))
+  }, [])
+
+  const abortTask = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'abort_task' }))
+  }, [])
+
+  const approveTask = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'approve_task' }))
+  }, [])
+
+  const rejectTask = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify({ type: 'reject_task' }))
+  }, [])
+
   const clearAll = useCallback(() => {
     setMessages([])
     clearSync()
   }, [clearSync])
 
-  return { isConnected, messages, executeTask, resetToHome, clearMessages: clearAll }
+  return {
+    isConnected,
+    messages,
+    executeTask,
+    resetToHome,
+    pauseTask,
+    resumeTask,
+    stepTask,
+    abortTask,
+    approveTask,
+    rejectTask,
+    clearMessages: clearAll,
+  }
 }

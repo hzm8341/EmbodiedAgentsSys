@@ -8,6 +8,11 @@ export interface AgentMessage {
     | 'learning'
     | 'result'
     | 'error'
+    | 'execution_status'
+    | 'execution_control'
+    | 'reset_complete'
+    | 'approval_required'
+    | 'approval_rejected'
   trace_id?: string
   step?: number
   timestamp?: number

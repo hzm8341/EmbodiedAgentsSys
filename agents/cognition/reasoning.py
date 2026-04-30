@@ -51,6 +51,17 @@ class DefaultReasoningLayer(ReasoningLayerBase):
         # Fallback: no-op move when sequence is exhausted or absent
         return {"action": "move_arm_to", "params": {"arm": "left", "x": 0.04, "y": 0.36, "z": 0.83}}
 
+    async def adapt_after_feedback(self, action: dict, feedback: dict) -> dict:
+        """Return a minimally adapted action when last execution failed."""
+        if feedback.get("success", False):
+            return action
+        adapted = dict(action)
+        params = dict(adapted.get("params", {}))
+        if "z" in params and isinstance(params["z"], (int, float)):
+            params["z"] = float(params["z"]) + 0.02
+        adapted["params"] = params
+        return adapted
+
 
 # 保持向后兼容
 class ReasoningLayer(DefaultReasoningLayer):

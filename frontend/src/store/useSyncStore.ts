@@ -20,6 +20,7 @@ interface SyncState {
   actual: [number, number, number] | null
   error: number | null
   history: SyncStep[]
+  executionState: 'idle' | 'running' | 'paused' | 'aborted' | 'completed'
   setCurrentTask: (task: string) => void
   setReasoningAction: (step: number, action: string, arm: string, target: [number, number, number] | null) => void
   commitExecution: (payload: {
@@ -32,6 +33,7 @@ interface SyncState {
     timestamp: number
   }) => void
   clearSync: () => void
+  setExecutionState: (state: 'idle' | 'running' | 'paused' | 'aborted' | 'completed') => void
 }
 
 export const useSyncStore = create<SyncState>((set) => ({
@@ -43,6 +45,7 @@ export const useSyncStore = create<SyncState>((set) => ({
   actual: null,
   error: null,
   history: [],
+  executionState: 'idle',
   setCurrentTask: (task) => set({ currentTask: task }),
   setReasoningAction: (step, action, arm, target) =>
     set({
@@ -85,5 +88,7 @@ export const useSyncStore = create<SyncState>((set) => ({
       actual: null,
       error: null,
       history: [],
+      executionState: 'idle',
     }),
+  setExecutionState: (executionState) => set({ executionState }),
 }))

@@ -166,3 +166,17 @@ class TwoLevelValidationPipeline:
             validator=last_validator_name,
             requires_human_approval=requires_approval,
         )
+
+    def classify_task_risk(self, task: str) -> str:
+        """Coarse task-level risk classifier for execution gating."""
+        text = (task or "").lower()
+        high_markers = ("real robot", "estop", "emergency", "high speed", "force")
+        medium_markers = ("grasp", "pick", "place")
+        if any(token in text for token in high_markers):
+            return "high"
+        if any(token in text for token in medium_markers):
+            return "medium"
+        return "low"
+
+    def approval_required_for_risk(self, risk_level: str) -> bool:
+        return risk_level == "high"

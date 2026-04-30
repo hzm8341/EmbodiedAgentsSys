@@ -47,6 +47,16 @@ class DefaultPlanningLayer(PlanningLayerBase):
             "current_step": 0,
         }
 
+    async def replan(self, task: str, reason: str, attempt: int) -> dict:
+        """Generate a conservative fallback replan after failed verification."""
+        return {
+            "task": f"{task} (replan-{attempt})",
+            "steps": ["recover", "retry", "verify"],
+            "description": f"Replan because: {reason}",
+            "action_sequence": [],
+            "current_step": 0,
+        }
+
 
 # 保持向后兼容
 class PlanningLayer(DefaultPlanningLayer):

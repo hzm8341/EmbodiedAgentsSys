@@ -12,6 +12,9 @@ from backend.services.event_bus import EventBus
 from backend.services.scenarios import list_scenarios
 from backend.services.task_execution_service import task_execution_service
 from backend.services.websocket_hub import WebSocketHub
+from backend.api.auth import ensure_role, resolve_role
+from agents.policy.validation_pipeline import TwoLevelValidationPipeline
+from agents.human_oversight.engine import HumanOversightEngine
 
 
 class ObservationPayload(BaseModel):
@@ -33,6 +36,8 @@ class ExecuteTaskRequest(BaseModel):
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 agent_event_bus = EventBus()
 agent_websocket_hub = WebSocketHub(agent_event_bus)
+policy_pipeline = TwoLevelValidationPipeline()
+oversight_engine = HumanOversightEngine()
 
 
 @router.get("/scenarios")
@@ -72,6 +77,12 @@ async def agent_websocket(websocket: WebSocket) -> None:
         robot_ids=_parse_filter_values(websocket.query_params.get("robot_id")),
         message_format="legacy",
     )
+    session_id = f"ws-{id(websocket)}"
+    token = websocket.query_params.get("token")
+    operator_role = resolve_role(token)
+    operator_identity = f"{operator_role or 'anonymous'}:{websocket.client.host if websocket.client else 'unknown'}"
+    ws_backend = websocket.query_params.get("backend")
+    pending_approval_request: TaskRequest | None = None
     try:
         while True:
             raw = await websocket.receive_text()
@@ -88,6 +99,7 @@ async def agent_websocket(websocket: WebSocket) -> None:
 
             if msg_type == "switch_backend":
                 backend_id = payload.get("backend")
+                ws_backend = backend_id
                 agent_websocket_hub.update_subscription(
                     websocket,
                     backend=backend_id if backend_id else None,
@@ -133,6 +145,67 @@ async def agent_websocket(websocket: WebSocket) -> None:
                 }))
                 continue
 
+            if msg_type in {"pause_task", "resume_task", "abort_task", "step_task"}:
+                command_map = {
+                    "pause_task": "pause",
+                    "resume_task": "resume",
+                    "abort_task": "abort",
+                    "step_task": "step",
+                }
+                result = task_execution_service.control_task(
+                    session_id, command_map[msg_type]
+                )
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "execution_control",
+                            "data": {
+                                "command": command_map[msg_type],
+                                **result,
+                            },
+                        }
+                    )
+                )
+                continue
+
+            if msg_type == "task_status":
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "execution_status",
+                            "data": {
+                                "state": task_execution_service.get_task_state(session_id)
+                            },
+                        }
+                    )
+                )
+                continue
+
+            if msg_type == "approve_task":
+                if pending_approval_request is None:
+                    await websocket.send_text(
+                        json.dumps({"type": "error", "data": {"message": "no pending approval"}})
+                    )
+                    continue
+                oversight_engine.approve()
+                await task_execution_service.start_task(
+                    session_id=session_id,
+                    request=pending_approval_request,
+                    downstream_stream_manager=agent_websocket_hub,
+                    operator=operator_identity,
+                )
+                pending_approval_request = None
+                await websocket.send_text(json.dumps({"type": "execution_status", "data": {"state": "running"}}))
+                continue
+
+            if msg_type == "reject_task":
+                oversight_engine.reject()
+                pending_approval_request = None
+                await websocket.send_text(
+                    json.dumps({"type": "approval_rejected", "data": {"state": "paused"}})
+                )
+                continue
+
             try:
                 request = ExecuteTaskRequest(**payload)
             except Exception as e:
@@ -158,11 +231,56 @@ async def agent_websocket(websocket: WebSocket) -> None:
                 observation_image=request.observation.image,
                 max_steps=request.max_steps,
             )
-            await task_execution_service.execute_task(
-                unified_request,
-                downstream_stream_manager=agent_websocket_hub,
+            risk_level = policy_pipeline.classify_task_risk(request.task)
+            if ws_backend == "real_robot":
+                try:
+                    ensure_role(token, "operator")
+                except Exception as e:
+                    await websocket.send_text(
+                        json.dumps({"type": "error", "data": {"message": str(e.detail if hasattr(e, 'detail') else e)}})
+                    )
+                    continue
+            if risk_level == "high":
+                pending_approval_request = unified_request
+                oversight_engine.request_approval()
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "approval_required",
+                            "data": {"risk_level": risk_level, "task": request.task},
+                        }
+                    )
+                )
+                continue
+
+            try:
+                await task_execution_service.start_task(
+                    session_id=session_id,
+                    request=unified_request,
+                    downstream_stream_manager=agent_websocket_hub,
+                    operator=operator_identity,
+                )
+            except RuntimeError as e:
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "data": {"message": str(e)},
+                        }
+                    )
+                )
+                continue
+
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "execution_status",
+                        "data": {"state": "running"},
+                    }
+                )
             )
     except WebSocketDisconnect:
         pass
     finally:
+        task_execution_service.control_task(session_id, "abort")
         agent_websocket_hub.disconnect(websocket)

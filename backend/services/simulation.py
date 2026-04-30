@@ -2,9 +2,11 @@
 import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 import mujoco
 from typing import Optional
 from backend.models.state import JointState, RobotRuntimeState
+from agents.core.types import RobotObservation
 from backend.services.state_store import state_store
 from simulation.mujoco import MuJoCoDriver
 from simulation.mujoco.config import DEFAULT_URDF_PATH
@@ -16,6 +18,7 @@ class SimulationService:
     _viewer = None
     _viewer_thread: Optional[threading.Thread] = None
     _viewer_running = False
+    _execution_state = "idle"
 
     def __new__(cls):
         if cls._instance is None:
@@ -29,6 +32,25 @@ class SimulationService:
             self._driver = MuJoCoDriver(urdf_path=urdf)
             self._driver.reset()
         return self
+
+    @property
+    def execution_state(self) -> str:
+        return self._execution_state
+
+    def pause_execution(self) -> None:
+        if self._execution_state == "running":
+            self._execution_state = "paused"
+            self._publish_state(status="paused")
+
+    def resume_execution(self) -> None:
+        if self._execution_state == "paused":
+            self._execution_state = "running"
+            self._publish_state(status="active")
+
+    def abort_execution(self) -> None:
+        self._execution_state = "aborted"
+        self.reset_to_home()
+        self._publish_state(status="aborted")
 
     def launch_viewer(self) -> None:
         """在独立守护线程里启动 MuJoCo passive viewer。
@@ -107,8 +129,24 @@ class SimulationService:
         """Execute action"""
         if self._driver is None:
             self.initialize()
-        receipt = self._driver.execute_action(action, params)
+        if self._execution_state == "paused":
+            raise RuntimeError("simulation paused")
+        if self._execution_state == "aborted":
+            raise RuntimeError("simulation aborted")
+
+        timeout_s = float(os.getenv("SIM_ACTION_TIMEOUT_SEC", "8.0"))
+        self._execution_state = "running"
         self._publish_state(status="active")
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(self._driver.execute_action, action, params)
+            try:
+                receipt = future.result(timeout=timeout_s)
+                self._execution_state = "idle"
+            except FutureTimeoutError as exc:
+                self._execution_state = "error"
+                self.reset_to_home()
+                self._publish_state(status="error")
+                raise TimeoutError(f"action timeout after {timeout_s}s") from exc
         return receipt
 
     def get_scene(self) -> dict:
@@ -117,10 +155,21 @@ class SimulationService:
             return {"robot_position": [0, 0, 0], "object_position": [0, 0, 0]}
         return self._driver.get_scene()
 
+    def get_observation(self) -> RobotObservation:
+        scene = self.get_scene()
+        joint_positions = self._driver.get_joint_positions() if self._driver else {}
+        state = {f"joint::{k}": float(v) for k, v in joint_positions.items()}
+        if "robot_position" in scene:
+            rp = scene.get("robot_position", [0, 0, 0])
+            if isinstance(rp, list) and len(rp) >= 3:
+                state.update({"robot_x": float(rp[0]), "robot_y": float(rp[1]), "robot_z": float(rp[2])})
+        return RobotObservation(state=state, gripper={})
+
     def reset_to_home(self) -> dict:
         """Reset robot to home position and restore objects."""
         if self._driver:
             self._driver.reset_to_home()
+            self._execution_state = "idle"
             self._publish_state(status="idle")
         return {"status": "success", "message": "Reset to home position"}
 
@@ -128,6 +177,7 @@ class SimulationService:
         """Reset environment"""
         if self._driver:
             self._driver.reset()
+            self._execution_state = "idle"
             self._publish_state(status="idle")
         return {"status": "success", "message": "Environment reset"}
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 type ConnectionStatus = 'connected' | 'disconnected' | 'connecting'
-type RobotStatus = 'idle' | 'working' | 'error'
+type RobotStatus = 'idle' | 'working' | 'paused' | 'aborted' | 'error'
 
 interface StatusState {
   connectionStatus: ConnectionStatus
