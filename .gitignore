@@ -281,8 +281,7 @@ RL-Robot-Manipulation/
 
 # AI models and large data
 models/
-!backend/models/
-!backend/models/*.py
+!backend/models/task_protocol.py
 *.pt
 *.pth
 *.gguf
